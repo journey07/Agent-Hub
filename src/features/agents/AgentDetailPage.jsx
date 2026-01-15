@@ -416,7 +416,7 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Avg Latency</div>
-                        <div className="kpi-value">
+                        <div className="kpi-value" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
                             <AnimatedNumber value={agent.avgResponseTime || 0} />
                             <span style={{ fontSize: '1rem', fontWeight: 600, marginLeft: '0.25rem' }}>ms</span>
                         </div>
@@ -436,13 +436,10 @@ export function AgentDetailPage() {
                             {agent.apiStatus === 'error' ? (
                                 '0.0%'
                             ) : (
-                                <>
-                                    <AnimatedNumber 
-                                        value={((1 - (agent.errorRate || 0)) * 100)} 
-                                        formatter={(val) => val.toFixed(1)}
-                                    />
-                                    %
-                                </>
+                                <AnimatedNumber 
+                                    value={((1 - (agent.errorRate || 0)) * 100)} 
+                                    formatter={(val) => `${val.toFixed(1)}%`}
+                                />
                             )}
                         </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>

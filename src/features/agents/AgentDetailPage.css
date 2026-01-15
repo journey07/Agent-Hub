@@ -459,6 +459,7 @@
     font-size: 0.85rem;
     line-height: 1.5;
     transition: background 0.1s;
+    animation: fadeIn 0.4s ease-in;
 }
 
 .log-entry:hover {
@@ -534,6 +535,7 @@
     align-items: center;
     min-width: 0;
     overflow: hidden;
+    animation: fadeIn 0.4s ease-in;
 }
 
 .recent-log-item:hover {
@@ -700,6 +702,15 @@
     100% {
         opacity: 1;
         transform: scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
     }
 }
 

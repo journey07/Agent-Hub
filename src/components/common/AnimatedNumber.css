@@ -1,7 +1,10 @@
 .animated-number {
-    display: inline-block;
+    display: inline-flex;
+    align-items: baseline;
     position: relative;
     vertical-align: baseline;
+    letter-spacing: 0.00em; /* 숫자 간 간격 증가 */
+    font-kerning: none;
 }
 
 .animated-number__container {
@@ -10,6 +13,8 @@
     overflow: hidden;
     height: 1.2em; /* 한 줄 높이 */
     line-height: 1.2em;
+    vertical-align: top;
+    margin-right: 0.00em; /* 숫자 간 간격 추가 */
 }
 
 .animated-number__digit {

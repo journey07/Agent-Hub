@@ -405,7 +405,7 @@
     font-weight: 700;
     color: #0f172a;
     line-height: 1;
-    letter-spacing: -0.03em;
+    letter-spacing: 0.02em; /* 숫자 간 간격 증가 */
     margin-top: 4px;
 }
 
@@ -503,8 +503,14 @@
 
 .stat-card__icon--clean {
     background: transparent;
-    width: auto;
-    height: auto;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .stat-card__icon--error {
@@ -1518,4 +1524,59 @@
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     max-width: 400px;
+}
+
+/* ============================================
+   Activity Log Animation
+   ============================================ */
+
+.activity-log-item {
+    /* 컨테이너는 레이아웃을 유지하되, 내용만 애니메이션 */
+    position: relative;
+}
+
+/* 아이콘은 항상 먼저 렌더링되고 보이도록 - 애니메이션과 무관 */
+.activity-log-icon {
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    /* GPU 가속으로 레이아웃 우선 처리 */
+    transform: translateZ(0);
+    will-change: auto;
+    /* 레이아웃이 먼저 확정되도록 */
+    contain: layout style paint;
+}
+
+.activity-log-icon svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    flex-shrink: 0 !important;
+}
+
+/* 텍스트 내용만 애니메이션 적용 */
+.activity-log-content,
+.activity-log-time {
+    animation: activityLogFadeIn 0.4s ease-in forwards;
+    opacity: 0;
+}
+
+@keyframes activityLogFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

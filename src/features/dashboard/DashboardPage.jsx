@@ -8,8 +8,47 @@ import {
     AlertCircleIconClean,
     CheckCircleIconClean,
     ClockIconClean,
-    InfoIconClean
+    InfoIconClean,
+    HeartIconClean
 } from '../../components/common/CustomIcons';
+
+// action 텍스트를 기반으로 아이콘 결정
+function getActivityIcon(log) {
+    const action = (log.action || '').toLowerCase();
+    
+    // complete, generated, calculated가 포함되면 success
+    if (action.includes('complete') || action.includes('generated') || action.includes('calculated')) {
+        return <CheckCircleIconClean size={20} />;
+    }
+    
+    // calling으로 시작하면 processing
+    if (action.startsWith('calling') || action.includes('calling')) {
+        return <ClockIconClean size={20} />;
+    }
+    
+    // type 기반 매칭 (기존 로직 유지)
+    if (log.type === 'success') {
+        return <CheckCircleIconClean size={20} />;
+    }
+    if (log.type === 'error') {
+        return <AlertCircleIconClean size={20} />;
+    }
+    if (log.type === 'warning') {
+        return <AlertCircleIconClean size={20} color="#F59E0B" />;
+    }
+    if (log.type === 'processing') {
+        return <ClockIconClean size={20} />;
+    }
+    if (log.type === 'log') {
+        return <InfoIconClean size={20} />;
+    }
+    if (log.type === 'heartbeat') {
+        return <HeartIconClean size={20} color="#EF4444" />;
+    }
+    
+    // 기본값: info
+    return <InfoIconClean size={20} />;
+}
 
 export function DashboardPage() {
     const { agents, stats, activityLogs, weeklyApiUsage, hourlyTraffic } = useAgents();
@@ -72,15 +111,10 @@ export function DashboardPage() {
                             <div
                                 key={log.id}
                                 className="flex items-center gap-md p-sm rounded-lg hover:bg-slate-50 transition-colors"
+                                style={{ animation: 'fadeIn 0.4s ease-in' }}
                             >
                                 <div className="stat-card__icon stat-card__icon--clean">
-                                    {log.type === 'success' && <CheckCircleIconClean size={20} />}
-                                    {log.type === 'error' && <AlertCircleIconClean size={20} />}
-                                    {log.type === 'warning' && <AlertCircleIconClean size={20} color="#F59E0B" />}
-                                    {log.type === 'processing' && <ClockIconClean size={20} />}
-                                    {log.type === 'info' && <InfoIconClean size={20} />}
-                                    {log.type === 'log' && <InfoIconClean size={20} />}
-                                    {log.type === 'heartbeat' && <InfoIconClean size={20} color="#10B981" />}
+                                    {getActivityIcon(log)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-semibold text-slate-900">{log.agent}</div>

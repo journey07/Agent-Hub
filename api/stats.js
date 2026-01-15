@@ -180,11 +180,17 @@ export default async function handler(req, res) {
 
         // 4. Handle Activity Log
         if (actionToLog) {
+            // "Quote:"로 시작하는 메시지에 "Calculated" 추가
+            let finalAction = actionToLog;
+            if (finalAction.startsWith('Quote:') && !finalAction.startsWith('Calculated Quote:')) {
+                finalAction = `Calculated ${finalAction}`;
+            }
+            
             const { error: logError } = await supabase
                 .from('activity_logs')
                 .insert({
                     agent_id: agentId,
-                    action: actionToLog,
+                    action: finalAction,
                     type: apiType === 'activity_log' ? 'log' : apiType,
                     status: logType || (isError ? 'error' : 'success'),
                     timestamp: new Date().toISOString(),
