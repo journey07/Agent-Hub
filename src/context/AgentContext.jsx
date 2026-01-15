@@ -535,13 +535,119 @@ export function AgentProvider({ children }) {
                 return session;
             };
             
-            console.log('💡 테스트: 브라우저 콘솔에서 testRealtimeInsert() 또는 checkAuthStatus() 실행하세요');
+            // 종합 진단 도구
+            window.diagnoseRealtime = async () => {
+                console.log('🔍🔍🔍 Realtime 완전 진단 시작 🔍🔍🔍\n');
+                
+                // 1. 인증 확인
+                const { data: { session }, error: authError } = await supabase.auth.getSession();
+                console.log('1️⃣ 인증 상태:', session ? '✅ 인증됨 (' + session.user.email + ')' : '❌ 인증 안 됨');
+                if (!session) {
+                    console.error('   → 로그인하세요!');
+                    return;
+                }
+                
+                // 2. WebSocket 연결 확인
+                const channels = supabase.realtime.channels;
+                console.log('\n2️⃣ WebSocket 채널 상태:');
+                if (channels.length === 0) {
+                    console.error('   ❌ 채널이 없습니다! Realtime이 연결되지 않았습니다.');
+                } else {
+                    channels.forEach(ch => {
+                        console.log(`   - ${ch.topic}: ${ch.state}`);
+                        if (ch.state !== 'joined' && ch.state !== 'subscribed') {
+                            console.error(`      ⚠️ 채널 상태가 비정상입니다: ${ch.state}`);
+                        }
+                    });
+                }
+                
+                // 3. 테이블 접근 확인
+                console.log('\n3️⃣ 테이블 접근 확인:');
+                const { data: tableData, error: tableError } = await supabase
+                    .from('activity_logs')
+                    .select('id')
+                    .limit(1);
+                if (tableError) {
+                    console.error('   ❌ 테이블 접근 실패:', tableError.message);
+                    console.error('   → RLS 정책 문제일 수 있습니다!');
+                } else {
+                    console.log('   ✅ 테이블 접근 성공');
+                }
+                
+                // 4. Publication 확인 (간접 - SQL 쿼리로)
+                console.log('\n4️⃣ Publication 확인:');
+                console.log('   → Supabase Dashboard → Database → Replication에서 확인하세요');
+                console.log('   → activity_logs, agents, daily_stats, hourly_stats, api_breakdown이 목록에 있어야 함');
+                
+                // 5. 실시간 테스트 구독
+                console.log('\n5️⃣ 실시간 테스트 구독 시작...');
+                const testChannel = supabase.channel('diagnosis-test-' + Date.now())
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'activity_logs'
+                    }, (payload) => {
+                        console.log('✅✅✅✅✅ 이벤트 수신 성공! ✅✅✅✅✅');
+                        console.log('   Payload:', payload);
+                        console.log('   → Realtime이 정상 작동합니다!');
+                    })
+                    .subscribe((status, err) => {
+                        console.log('   구독 상태:', status);
+                        if (status === 'SUBSCRIBED') {
+                            console.log('   ✅ 테스트 구독 성공!');
+                            console.log('   → 이제 testRealtimeInsert() 실행하거나');
+                            console.log('   → Supabase Dashboard에서 activity_logs에 직접 INSERT 해보세요');
+                        } else {
+                            console.error('   ❌ 테스트 구독 실패:', status, err);
+                            if (status === 'CHANNEL_ERROR') {
+                                console.error('   → Realtime 서비스가 비활성화되었을 수 있습니다!');
+                                console.error('   → Supabase Dashboard → Realtime → Settings 확인');
+                            }
+                        }
+                    });
+                
+                // 6. 종합 결과
+                console.log('\n📊 종합 진단 결과:');
+                const hasChannels = channels.length > 0;
+                const hasTableAccess = !tableError;
+                const allGood = hasChannels && hasTableAccess && session;
+                
+                if (allGood) {
+                    console.log('✅ 기본 설정은 정상입니다.');
+                    console.log('⚠️ 하지만 이벤트가 안 오면:');
+                    console.log('   1. Supabase Dashboard → Realtime → Settings → "Enable Realtime service" 확인');
+                    console.log('   2. Supabase Dashboard → Database → Replication에서 테이블 확인');
+                    console.log('   3. Network 탭 → WebSocket → Messages에서 이벤트 확인');
+                } else {
+                    console.error('❌ 문제 발견:');
+                    if (!session) console.error('   - 인증 안 됨');
+                    if (!hasChannels) console.error('   - WebSocket 채널 없음');
+                    if (!hasTableAccess) console.error('   - 테이블 접근 실패 (RLS 문제 가능)');
+                }
+                
+                return {
+                    session: !!session,
+                    channels: channels.length,
+                    tableAccess: !tableError,
+                    testChannel
+                };
+            };
+            
+            console.log('💡 테스트: 브라우저 콘솔에서 다음 명령어 실행:');
+            console.log('   - testRealtimeInsert() : Realtime INSERT 테스트');
+            console.log('   - checkAuthStatus() : 인증 상태 확인');
+            console.log('   - diagnoseRealtime() : 완전 진단 (추천!)');
         }
 
         // Use a single channel for all dashboard updates to avoid connection limits/race conditions
         console.log('🔍 [Realtime] Channel 생성 시작...');
         const channel = supabase
-        .channel('dashboard-realtime')
+        .channel('dashboard-realtime', {
+            config: {
+                broadcast: { self: true },
+                presence: { key: '' }
+            }
+        })
         
         // 모든 이벤트를 로깅 (디버깅용)
         .on('broadcast', { event: '*' }, (payload) => {
@@ -550,7 +656,7 @@ export function AgentProvider({ children }) {
         .on('presence', { event: '*' }, (payload) => {
             console.log('📡 [DEBUG] Presence 이벤트:', payload);
         })
-        .on('postgres_changes', { event: '*' }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
             console.log('🚨🚨🚨 [DEBUG] Postgres 변경 감지 (모든 이벤트) 🚨🚨🚨');
             console.log('📡 이벤트 타입:', payload.eventType);
             console.log('📡 테이블:', payload.table);
@@ -561,7 +667,8 @@ export function AgentProvider({ children }) {
             {
                 event: '*',
                 schema: 'public',
-                table: 'agents'
+                table: 'agents',
+                filter: undefined  // 명시적으로 필터 없음
             },
                 async (payload) => {
                     console.log('⚡ 실시간 업데이트:', payload.eventType, payload.new?.id || payload.old?.id);
@@ -617,8 +724,8 @@ export function AgentProvider({ children }) {
             {
                 event: '*',  // INSERT, UPDATE, DELETE 모두 구독
                 schema: 'public',
-                table: 'activity_logs'
-                // filter 제거 - 모든 이벤트 구독
+                table: 'activity_logs',
+                filter: undefined  // 명시적으로 필터 없음
             },
             (payload) => {
                 console.log('🎯🎯🎯🎯🎯 activity_logs 이벤트 핸들러 실행! 🎯🎯🎯🎯🎯');
@@ -710,7 +817,8 @@ export function AgentProvider({ children }) {
             {
                 event: '*',
                 schema: 'public',
-                table: 'api_breakdown'
+                table: 'api_breakdown',
+                filter: undefined
             },
             async (payload) => {
                 console.log('📡 API breakdown changed:', payload.eventType);
@@ -728,7 +836,8 @@ export function AgentProvider({ children }) {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'daily_stats'
+                    table: 'daily_stats',
+                    filter: undefined
                 },
                 async (payload) => {
                     console.log('📡 Daily stats changed (실시간):', payload.eventType, payload.new);
@@ -752,7 +861,8 @@ export function AgentProvider({ children }) {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'hourly_stats'
+                    table: 'hourly_stats',
+                    filter: undefined
                 },
                 async (payload) => {
                     console.log('📡 Hourly stats changed (실시간):', payload.eventType, payload.new);
@@ -771,8 +881,20 @@ export function AgentProvider({ children }) {
                     }
                 }
             )
-            .subscribe((status, err) => {
+            .subscribe(async (status, err) => {
                 console.log(`🚨🚨🚨 Realtime 구독 상태 변경: ${status} 🚨🚨🚨`, err || '');
+                
+                // 구독 파라미터 확인
+                if (channel.bindings && channel.bindings.length > 0) {
+                    console.log('📋 구독 파라미터:', channel.bindings);
+                    channel.bindings.forEach((binding, idx) => {
+                        console.log(`   ${idx + 1}. ${binding.event} - ${binding.schema}.${binding.table}`);
+                    });
+                } else {
+                    console.warn('⚠️ 구독 파라미터가 없습니다! "No subscription params" 오류의 원인일 수 있습니다.');
+                    console.warn('   → Supabase Dashboard → Database → Replication에서 테이블 확인');
+                    console.warn('   → Publication에 테이블이 추가되어 있어야 합니다');
+                }
                 
                 if (status === 'SUBSCRIBED') {
                     console.log('✅✅✅✅✅ WebSocket Connected - 실시간 업데이트 활성화! ✅✅✅✅✅');
@@ -784,6 +906,7 @@ export function AgentProvider({ children }) {
                     console.log('🔍 디버깅: Network 탭 → WebSocket 연결 확인');
                     console.log('   - wss://...supabase.co/realtime/... 연결 확인');
                     console.log('   - Messages 탭에서 postgres_changes 이벤트 확인');
+                    console.log('   - "No subscription params" 메시지가 있으면 Publication 문제');
                     console.log('');
                     setIsConnected(true);
                     
