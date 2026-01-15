@@ -8,7 +8,16 @@ import { useAuth } from './AuthContext';
 const AgentContext = createContext(null);
 
 export function AgentProvider({ children }) {
+    // 최상단에 강제 로그 (항상 실행되는지 확인)
+    console.log('🚨🚨🚨 [AgentProvider] 컴포넌트 렌더링 시작 🚨🚨🚨');
+    
     const { session, isAuthenticated } = useAuth();
+    console.log('🚨🚨🚨 [AgentProvider] useAuth() 호출 완료:', { 
+        isAuthenticated, 
+        hasSession: !!session,
+        userEmail: session?.user?.email || 'None'
+    });
+    
     const [agents, setAgents] = useState([]);
     const [activityLogs, setActivityLogs] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -27,7 +36,7 @@ export function AgentProvider({ children }) {
     
     // 디버깅: 컴포넌트 마운트 확인
     useEffect(() => {
-        console.log('🔍 [AgentContext] 컴포넌트 마운트됨');
+        console.log('🚨🚨🚨 [AgentContext] 컴포넌트 마운트됨 🚨🚨🚨');
         return () => {
             console.log('🔍 [AgentContext] 컴포넌트 언마운트됨');
         };
@@ -456,8 +465,23 @@ export function AgentProvider({ children }) {
     // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
     // 인증 상태가 변경될 때마다 Realtime 구독 재설정
     useEffect(() => {
-        console.log('🔍 [Realtime Setup] useEffect 실행됨');
-        console.log('🔍 [Realtime Setup] 인증 상태:', { isAuthenticated, hasSession: !!session });
+        // 강제로 콘솔에 출력 (항상 실행되는지 확인)
+        console.log('🚨🚨🚨 [Realtime Setup] useEffect 실행됨 🚨🚨🚨');
+        console.log('🔍 [Realtime Setup] 인증 상태:', { 
+            isAuthenticated, 
+            hasSession: !!session,
+            sessionUser: session?.user?.email || 'None',
+            sessionId: session?.user?.id || 'None'
+        });
+        
+        // 직접 Supabase에서 세션 확인 (이중 체크)
+        supabase.auth.getSession().then(({ data: { session: directSession }, error }) => {
+            console.log('🔍 [Realtime Setup] 직접 세션 확인:', {
+                hasDirectSession: !!directSession,
+                directUser: directSession?.user?.email || 'None',
+                error: error?.message || 'None'
+            });
+        });
         
         // 로그인하지 않았으면 Realtime 구독하지 않음
         if (!isAuthenticated || !session) {
@@ -593,7 +617,8 @@ export function AgentProvider({ children }) {
                 // filter 제거 - 모든 INSERT 이벤트 구독
             },
             (payload) => {
-                console.log('🎯🎯🎯 activity_logs INSERT 이벤트 핸들러 실행! 🎯🎯🎯');
+                console.log('🎯🎯🎯🎯🎯 activity_logs INSERT 이벤트 핸들러 실행! 🎯🎯🎯🎯🎯');
+                console.log('🚨🚨🚨 이 메시지가 보이면 Realtime이 작동하는 것입니다! 🚨🚨🚨');
                 const receivedTime = Date.now();
                 const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
                 const delay = receivedTime - logTimestamp;
@@ -736,10 +761,10 @@ export function AgentProvider({ children }) {
                 }
             )
             .subscribe((status, err) => {
-                console.log(`🔍 Realtime 구독 상태 변경: ${status}`, err || '');
+                console.log(`🚨🚨🚨 Realtime 구독 상태 변경: ${status} 🚨🚨🚨`, err || '');
                 
                 if (status === 'SUBSCRIBED') {
-                    console.log('✅✅✅ WebSocket Connected - 실시간 업데이트 활성화!');
+                    console.log('✅✅✅✅✅ WebSocket Connected - 실시간 업데이트 활성화! ✅✅✅✅✅');
                     console.log('📡 Subscribed to: agents, activity_logs, daily_stats, hourly_stats, api_breakdown');
                     console.log('🔍 Realtime 연결 상태: SUBSCRIBED - 이제 실시간 업데이트가 작동합니다!');
                     console.log('');
@@ -750,6 +775,14 @@ export function AgentProvider({ children }) {
                     console.log('   - Messages 탭에서 postgres_changes 이벤트 확인');
                     console.log('');
                     setIsConnected(true);
+                    
+                    // 구독 성공 후 즉시 테스트 INSERT 실행 (자동 테스트)
+                    setTimeout(async () => {
+                        console.log('🧪 자동 테스트: 3초 후 testRealtimeInsert() 실행...');
+                        if (window.testRealtimeInsert) {
+                            await window.testRealtimeInsert();
+                        }
+                    }, 3000);
                 } else if (status === 'CLOSED') {
                     console.error('❌ WebSocket Disconnected - Realtime이 끊어졌습니다!');
                     console.error('⚠️ 이제 fallback polling (30초마다)만 작동합니다.');
