@@ -19,10 +19,10 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
     const errorRate = clientAgents.reduce((sum, agent) => sum + (agent.errorRate || 0), 0) / (clientAgents.length || 1);
     const healthScore = Math.max(0, Math.min(100, 100 - (errorRate * 1000))); // Simple subtraction logic
 
-    // 숫자 카운트업 애니메이션
-    const animatedHealthScore = useCountUp(healthScore, 800);
-    const animatedOnlineAgents = useCountUp(onlineAgents, 800);
-    const animatedTotalTodayCalls = useCountUp(totalTodayCalls, 800);
+    // 숫자 카운트업 애니메이션 (1씩 천천히 증가)
+    const animatedHealthScore = useCountUp(healthScore, 1000, 0, 50);
+    const animatedOnlineAgents = useCountUp(onlineAgents, 1000, 0, 50);
+    const animatedTotalTodayCalls = useCountUp(totalTodayCalls, 1000, 0, 50);
 
     const getHealthColor = (score) => {
         if (score >= 90) return '#10B981'; // Emerald 500

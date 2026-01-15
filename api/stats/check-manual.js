@@ -59,8 +59,6 @@ export default async function handler(req, res) {
         // Get authenticated Supabase client
         const supabase = await getSupabaseClient();
 
-        console.log(`🔘 Manual Check Triggered for ${agentId}`);
-
         // Fetch agent from Supabase
         const { data: agent, error } = await supabase
             .from('agents')
@@ -93,8 +91,6 @@ export default async function handler(req, res) {
             });
         }
 
-        console.log(`✅ Found agent: ${agentId}, base_url: ${agent.base_url || 'null'}`);
-
         let newStatus = 'online';
         let newApiStatus = 'healthy';
 
@@ -106,8 +102,6 @@ export default async function handler(req, res) {
         // Check agent health endpoints
         try {
             const healthUrl = `${agent.base_url}/api/quote/health`;
-            console.log(`🔍 Checking health at: ${healthUrl}`);
-            
             const healthRes = await fetch(healthUrl, { 
                 signal: AbortSignal.timeout(5000) 
             });
@@ -118,12 +112,8 @@ export default async function handler(req, res) {
                 newStatus = 'offline';
                 newApiStatus = 'error';
             } else {
-                console.log(`✅ Health check passed for ${agentId}`);
-                
                 // Verify API endpoint
                 const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
-                console.log(`🔍 Verifying API at: ${verifyUrl}`);
-                
                 const verifyRes = await fetch(verifyUrl, { 
                     method: 'POST', 
                     signal: AbortSignal.timeout(5000) 
@@ -136,7 +126,6 @@ export default async function handler(req, res) {
                 } else {
                     const verifyData = await verifyRes.json();
                     newApiStatus = verifyData.success ? 'healthy' : 'error';
-                    console.log(`✅ API verify result: ${newApiStatus}`);
                 }
             }
         } catch (err) {
@@ -186,9 +175,7 @@ export default async function handler(req, res) {
                     })
                 });
 
-                if (heartbeatResponse.ok) {
-                    console.log(`💓 Heartbeat sent via status check for ${agentId}`);
-                } else {
+                if (!heartbeatResponse.ok) {
                     const errorText = await heartbeatResponse.text().catch(() => 'Unknown error');
                     console.error(`⚠️ Failed to send heartbeat: ${heartbeatResponse.status} - ${errorText}`);
                 }

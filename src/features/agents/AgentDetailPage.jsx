@@ -9,7 +9,7 @@ import './AgentDetailPage.css';
 
 // Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
 function TaskPerformanceItem({ task }) {
-    const animatedPeriod = useCountUp(task.period || 0, 800);
+    const animatedPeriod = useCountUp(task.period || 0, 1000, 0, 50);
     
     return (
         <div className="task-item-premium">
@@ -47,10 +47,11 @@ export function AgentDetailPage() {
     // Auto-scroll logic removed as logs are ordered newest-first (top)
 
     // 숫자 카운트업 애니메이션 (모든 훅을 조건부 return 전에 호출)
-    const animatedTodayTasks = useCountUp(agent?.todayTasks || 0, 800);
-    const animatedTodayApiCalls = useCountUp(agent?.todayApiCalls || 0, 800);
-    const animatedAvgResponseTime = useCountUp(agent?.avgResponseTime || 0, 800, 0);
-    const animatedSuccessRate = useCountUp(agent?.apiStatus === 'error' ? 0 : ((1 - (agent?.errorRate || 0)) * 100), 800, 1);
+    // latency는 숫자가 자주 바뀌므로 1씩 천천히 증가하도록 (1초 duration, 50ms stepDelay)
+    const animatedTodayTasks = useCountUp(agent?.todayTasks || 0, 1000, 0, 50);
+    const animatedTodayApiCalls = useCountUp(agent?.todayApiCalls || 0, 1000, 0, 50);
+    const animatedAvgResponseTime = useCountUp(agent?.avgResponseTime || 0, 1000, 0, 50);
+    const animatedSuccessRate = useCountUp(agent?.apiStatus === 'error' ? 0 : ((1 - (agent?.errorRate || 0)) * 100), 1000, 1, 50);
 
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
@@ -106,16 +107,11 @@ export function AgentDetailPage() {
                 };
             });
 
-            console.log('🔍 [DEBUG] hourlyStats:', agent.hourlyStats);
-            console.log('🔍 [DEBUG] fullDayData length:', fullDayData.length);
-            console.log('🔍 [DEBUG] Sample data points:', fullDayData.slice(0, 3), '...', fullDayData.slice(18, 21));
-
             return fullDayData;
         } else {
             // Daily - Week/Month (Show Daily History + Today)
             if (!agent) return [];
             const history = agent.dailyHistory || [];
-            console.log('🔍 [DEBUG] dailyHistory:', history);
 
             // Filter out existing "Today" entry from history if it exists to avoid duplication
             // Use Korean timezone (24시 기준 = 자정 00:00)

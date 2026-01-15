@@ -9,9 +9,9 @@ export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }
     const [resultMessage, setResultMessage] = useState(null);
     const [isError, setIsError] = useState(false);
     
-    // 숫자 카운트업 애니메이션
-    const animatedTodayTasks = useCountUp(agent.todayTasks || 0, 800);
-    const animatedTodayApiCalls = useCountUp(agent.todayApiCalls || 0, 800);
+    // 숫자 카운트업 애니메이션 (1씩 천천히 증가)
+    const animatedTodayTasks = useCountUp(agent.todayTasks || 0, 1000, 0, 50);
+    const animatedTodayApiCalls = useCountUp(agent.todayApiCalls || 0, 1000, 0, 50);
     
     const handleCheck = async () => {
         if (!agent.isLiveAgent || isChecking) return;

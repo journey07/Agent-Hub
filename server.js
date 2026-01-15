@@ -67,8 +67,6 @@ app.post('/api/stats', async (req, res) => {
 
         const actionToLog = logAction || logMessage;
 
-        console.log(`📥 Incoming API Call: ${agentId} - ${apiType} ${actionToLog ? `(Log: ${actionToLog})` : ''}`);
-
         // 1. Handle Heartbeat (Registration)
         if (apiType === 'heartbeat') {
             const { error: hbError } = await supabase
@@ -82,7 +80,6 @@ app.post('/api/stats', async (req, res) => {
                 .eq('id', agentId);
 
             if (hbError) console.error(`❌ Heartbeat Error [${agentId}]:`, hbError.message);
-            else console.log(`💓 Heartbeat: ${agentId}`);
             return res.json({ success: !hbError });
         }
 
@@ -97,7 +94,6 @@ app.post('/api/stats', async (req, res) => {
                 .eq('id', agentId);
 
             if (stError) console.error(`❌ Status Change Error [${agentId}]:`, stError.message);
-            else console.log(`🔄 Status Change: ${agentId} -> ${status}`);
             return res.json({ success: !stError });
         }
 
@@ -128,7 +124,6 @@ app.post('/api/stats', async (req, res) => {
                     response_time: responseTime || 0
                 });
             if (logError) console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
-            else console.log(`📋 Logged: ${agentId} - ${actionToLog}`);
         }
 
         // No need to broadcast via WebSocket anymore! 
@@ -154,8 +149,6 @@ app.post('/api/stats/check-manual', async (req, res) => {
             });
         }
 
-        console.log(`🔘 Manual Check Triggered for ${agentId}`);
-        
         // Fetch agent from Supabase
         const { data: agent, error } = await supabase
             .from('agents')
@@ -188,8 +181,6 @@ app.post('/api/stats/check-manual', async (req, res) => {
             });
         }
 
-        console.log(`✅ Found agent: ${agentId}, base_url: ${agent.base_url || 'null'}`);
-
         let newStatus = 'online';
         let newApiStatus = 'healthy';
 
@@ -200,8 +191,6 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
         try {
             const healthUrl = `${agent.base_url}/api/quote/health`;
-            console.log(`🔍 Checking health at: ${healthUrl}`);
-            
             const healthRes = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
             
             if (!healthRes.ok) {
@@ -210,12 +199,8 @@ app.post('/api/stats/check-manual', async (req, res) => {
                 newStatus = 'offline';
                 newApiStatus = 'error';
             } else {
-                console.log(`✅ Health check passed for ${agentId}`);
-                
                 // Verify API endpoint
                 const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
-                console.log(`🔍 Verifying API at: ${verifyUrl}`);
-                
                 const verifyRes = await fetch(verifyUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
                 
                 if (!verifyRes.ok) {
@@ -225,7 +210,6 @@ app.post('/api/stats/check-manual', async (req, res) => {
                 } else {
                     const verifyData = await verifyRes.json();
                     newApiStatus = verifyData.success ? 'healthy' : 'error';
-                    console.log(`✅ API verify result: ${newApiStatus}`);
                 }
             }
         } catch (err) {
@@ -300,8 +284,6 @@ app.post('/api/stats/check-manual', async (req, res) => {
                             timestamp: nowIso,
                             response_time: 0
                         });
-                    
-                    console.log(`💓 Heartbeat sent via status check for ${agentId}`);
                 }
             } catch (hbError) {
                 console.error(`⚠️ Failed to send heartbeat:`, hbError.message);

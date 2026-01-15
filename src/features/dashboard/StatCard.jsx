@@ -25,14 +25,14 @@ export function StatCard({ label, value, iconColor = 'primary', className = '' }
 
     const parsed = parseValue();
     
-    // 애니메이션 값 계산
+    // 애니메이션 값 계산 (1씩 천천히 증가)
     let animatedValue = null;
     let animatedFirst = null;
     
     if (parsed.type === 'number' || parsed.type === 'suffix') {
-        animatedValue = useCountUp(parsed.num, 800);
+        animatedValue = useCountUp(parsed.num, 1000, 0, 50);
     } else if (parsed.type === 'ratio') {
-        animatedFirst = useCountUp(parsed.first, 800);
+        animatedFirst = useCountUp(parsed.first, 1000, 0, 50);
     }
 
     // Map iconColor to actual color values for the square indicator

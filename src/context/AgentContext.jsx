@@ -83,9 +83,6 @@ export function AgentProvider({ children }) {
             }
         });
 
-        if (totalDataPoints === 0) {
-            console.warn('⚠️ No daily_stats data found for chart.');
-        }
 
         // Convert to array and ensure all 7 days are present
         const result = dates.map(date => {
@@ -223,12 +220,6 @@ export function AgentProvider({ children }) {
 
             // 날짜가 바뀌었으면 (자정이 지났으면)
             if (lastCheckedDate && lastCheckedDate !== currentDateKorea) {
-                console.log('🔄 자정 감지! 날짜가 바뀌었습니다:', {
-                    이전날짜: lastCheckedDate,
-                    새날짜: currentDateKorea
-                });
-                console.log('📊 DB 리셋 및 데이터 새로고침 중...');
-
                 try {
                     // 1. DB에서 즉시 리셋 (모든 에이전트의 today 통계 리셋)
                     const { error: resetError } = await supabase.rpc('reset_today_stats_for_all_agents');
@@ -236,8 +227,6 @@ export function AgentProvider({ children }) {
                     if (resetError) {
                         console.error('❌ DB 리셋 실패:', resetError);
                         // 리셋 실패해도 데이터 새로고침은 진행
-                    } else {
-                        console.log('✅ DB 리셋 완료! 모든 today 통계가 0으로 초기화되었습니다.');
                     }
 
                     // 2. 데이터 새로고침 (리셋된 데이터 가져오기)
@@ -245,8 +234,6 @@ export function AgentProvider({ children }) {
 
                     // 3. 날짜 업데이트
                     localStorage.setItem(lastCheckedDateKey, currentDateKorea);
-
-                    console.log('✅ 자정 리셋 완료! 새로운 날의 데이터가 표시됩니다.');
                 } catch (error) {
                     console.error('❌ 자정 리셋 중 오류:', error);
                     // 오류가 나도 날짜는 업데이트 (다음 체크에서 다시 시도)
@@ -507,142 +494,6 @@ export function AgentProvider({ children }) {
             return;
         }
         
-        // 전역 변수로 테스트 함수 노출 (브라우저 콘솔에서 사용)
-        if (typeof window !== 'undefined') {
-            window.testRealtimeInsert = async () => {
-                console.log('🧪 Realtime INSERT 테스트 시작...');
-                
-                // 인증 상태 확인
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session) {
-                    console.error('❌ 인증되지 않음 - 먼저 로그인하세요!');
-                    return;
-                }
-                
-                const { data, error } = await supabase
-                    .from('activity_logs')
-                    .insert({
-                        agent_id: 'agent-worldlocker-001',
-                        action: '🧪 테스트 로그 - Realtime 작동 확인',
-                        type: 'test',
-                        status: 'info',
-                        timestamp: new Date().toISOString(),
-                        response_time: 0
-                    });
-                
-                if (error) {
-                    console.error('❌ INSERT 실패:', error);
-                } else {
-                    console.log('✅ INSERT 성공:', data);
-                    console.log('⏳ 이제 "⚡⚡⚡ 실시간 로그 이벤트 수신!" 메시지가 나타나야 합니다...');
-                }
-            };
-            
-            window.checkAuthStatus = async () => {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                console.log('🔍 인증 상태:', session ? '✅ 인증됨' : '❌ 인증 안 됨', session?.user?.email || '');
-                return session;
-            };
-            
-            // 종합 진단 도구
-            window.diagnoseRealtime = async () => {
-                console.log('🔍🔍🔍 Realtime 완전 진단 시작 🔍🔍🔍\n');
-                
-                // 1. 인증 확인
-                const { data: { session }, error: authError } = await supabase.auth.getSession();
-                console.log('1️⃣ 인증 상태:', session ? '✅ 인증됨 (' + session.user.email + ')' : '❌ 인증 안 됨');
-                if (!session) {
-                    console.error('   → 로그인하세요!');
-                    return;
-                }
-                
-                // 2. WebSocket 연결 확인
-                const channels = supabase.realtime.channels;
-                console.log('\n2️⃣ WebSocket 채널 상태:');
-                if (channels.length === 0) {
-                    console.error('   ❌ 채널이 없습니다! Realtime이 연결되지 않았습니다.');
-                } else {
-                    channels.forEach(ch => {
-                        console.log(`   - ${ch.topic}: ${ch.state}`);
-                        if (ch.state !== 'joined' && ch.state !== 'subscribed') {
-                            console.error(`      ⚠️ 채널 상태가 비정상입니다: ${ch.state}`);
-                        }
-                    });
-                }
-                
-                // 3. 테이블 접근 확인
-                console.log('\n3️⃣ 테이블 접근 확인:');
-                const { data: tableData, error: tableError } = await supabase
-                    .from('activity_logs')
-                    .select('id')
-                    .limit(1);
-                if (tableError) {
-                    console.error('   ❌ 테이블 접근 실패:', tableError.message);
-                    console.error('   → RLS 정책 문제일 수 있습니다!');
-                } else {
-                    console.log('   ✅ 테이블 접근 성공');
-                }
-                
-                // 4. Publication 확인 (간접 - SQL 쿼리로)
-                console.log('\n4️⃣ Publication 확인:');
-                console.log('   → Supabase Dashboard → Database → Replication에서 확인하세요');
-                console.log('   → activity_logs, agents, daily_stats, hourly_stats, api_breakdown이 목록에 있어야 함');
-                
-                // 5. 실시간 테스트 구독
-                console.log('\n5️⃣ 실시간 테스트 구독 시작...');
-                const testChannel = supabase.channel('diagnosis-test-' + Date.now())
-                    .on('postgres_changes', {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'activity_logs'
-                    }, (payload) => {
-                        console.log('✅✅✅✅✅ 이벤트 수신 성공! ✅✅✅✅✅');
-                        console.log('   Payload:', payload);
-                        console.log('   → Realtime이 정상 작동합니다!');
-                    })
-                    .subscribe((status, err) => {
-                        console.log('   구독 상태:', status);
-                        if (status === 'SUBSCRIBED') {
-                            console.log('   ✅ 테스트 구독 성공!');
-                            console.log('   → 이제 testRealtimeInsert() 실행하거나');
-                            console.log('   → Supabase Dashboard에서 activity_logs에 직접 INSERT 해보세요');
-                        } else {
-                            console.error('   ❌ 테스트 구독 실패:', status, err);
-                            if (status === 'CHANNEL_ERROR') {
-                                console.error('   → Realtime 서비스가 비활성화되었을 수 있습니다!');
-                                console.error('   → Supabase Dashboard → Realtime → Settings 확인');
-                            }
-                        }
-                    });
-                
-                // 6. 종합 결과
-                console.log('\n📊 종합 진단 결과:');
-                const hasChannels = channels.length > 0;
-                const hasTableAccess = !tableError;
-                const allGood = hasChannels && hasTableAccess && session;
-                
-                if (allGood) {
-                    console.log('✅ 기본 설정은 정상입니다.');
-                    console.log('⚠️ 하지만 이벤트가 안 오면:');
-                    console.log('   1. Supabase Dashboard → Realtime → Settings → "Enable Realtime service" 확인');
-                    console.log('   2. Supabase Dashboard → Database → Replication에서 테이블 확인');
-                    console.log('   3. Network 탭 → WebSocket → Messages에서 이벤트 확인');
-                } else {
-                    console.error('❌ 문제 발견:');
-                    if (!session) console.error('   - 인증 안 됨');
-                    if (!hasChannels) console.error('   - WebSocket 채널 없음');
-                    if (!hasTableAccess) console.error('   - 테이블 접근 실패 (RLS 문제 가능)');
-                }
-                
-                return {
-                    session: !!session,
-                    channels: channels.length,
-                    tableAccess: !tableError,
-                    testChannel
-                };
-            };
-            
-        }
 
         // Use a single channel for all dashboard updates
         const channel = supabase
