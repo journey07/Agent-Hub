@@ -14,6 +14,24 @@ export function AgentProvider({ children }) {
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // 디버깅: 인증 상태 로깅
+    useEffect(() => {
+        console.log('🔍 [AgentContext] 인증 상태 변경:', {
+            isAuthenticated,
+            hasSession: !!session,
+            userEmail: session?.user?.email || 'None',
+            sessionId: session?.user?.id || 'None'
+        });
+    }, [isAuthenticated, session]);
+    
+    // 디버깅: 컴포넌트 마운트 확인
+    useEffect(() => {
+        console.log('🔍 [AgentContext] 컴포넌트 마운트됨');
+        return () => {
+            console.log('🔍 [AgentContext] 컴포넌트 언마운트됨');
+        };
+    }, []);
 
     // Calculate real-time stats
     const calculateStats = (currentAgents) => {
@@ -438,10 +456,14 @@ export function AgentProvider({ children }) {
     // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
     // 인증 상태가 변경될 때마다 Realtime 구독 재설정
     useEffect(() => {
+        console.log('🔍 [Realtime Setup] useEffect 실행됨');
+        console.log('🔍 [Realtime Setup] 인증 상태:', { isAuthenticated, hasSession: !!session });
+        
         // 로그인하지 않았으면 Realtime 구독하지 않음
         if (!isAuthenticated || !session) {
             console.log('⏸️ 로그인하지 않음 - Realtime 구독 대기 중...');
             console.log('💡 로그인 후 자동으로 Realtime 구독이 시작됩니다.');
+            console.log('💡 현재 상태:', { isAuthenticated, session: session ? '있음' : '없음' });
             setIsConnected(false);
             return;
         }
@@ -492,6 +514,7 @@ export function AgentProvider({ children }) {
         }
 
         // Use a single channel for all dashboard updates to avoid connection limits/race conditions
+        console.log('🔍 [Realtime] Channel 생성 시작...');
         const channel = supabase
         .channel('dashboard-realtime')
         
@@ -755,7 +778,7 @@ export function AgentProvider({ children }) {
             }
             supabase.removeChannel(channel);
         };
-    }, [isAuthenticated, session]); // 인증 상태가 변경될 때마다 재구독
+    }, [isAuthenticated, session?.user?.id]); // 인증 상태가 변경될 때마다 재구독 (session 객체 전체보다 user.id 사용)
 
     // Toggle agent status (on/off)
     const toggleAgent = useCallback(async (agentId) => {
