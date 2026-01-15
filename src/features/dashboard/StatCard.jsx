@@ -1,6 +1,40 @@
 import { formatCompactNumber } from '../../utils/formatters';
+import { useCountUp } from '../../utils/useCountUp';
 
 export function StatCard({ label, value, iconColor = 'primary', className = '' }) {
+    // 숫자 값 추출 및 애니메이션 처리
+    const parseValue = () => {
+        if (typeof value === 'number') {
+            return { type: 'number', num: value, suffix: '' };
+        }
+        if (typeof value === 'string') {
+            // "123 / 456" 형식 처리
+            if (value.includes(' / ')) {
+                const parts = value.split(' / ');
+                const firstNum = parseInt(parts[0].replace(/,/g, ''), 10);
+                return { type: 'ratio', first: firstNum, second: parts[1] };
+            }
+            // "123ms" 형식 처리
+            if (value.includes('ms')) {
+                const num = parseInt(value.replace('ms', '').replace(/,/g, ''), 10);
+                return { type: 'suffix', num: num, suffix: 'ms' };
+            }
+        }
+        return { type: 'string', value: value };
+    };
+
+    const parsed = parseValue();
+    
+    // 애니메이션 값 계산
+    let animatedValue = null;
+    let animatedFirst = null;
+    
+    if (parsed.type === 'number' || parsed.type === 'suffix') {
+        animatedValue = useCountUp(parsed.num, 800);
+    } else if (parsed.type === 'ratio') {
+        animatedFirst = useCountUp(parsed.first, 800);
+    }
+
     // Map iconColor to actual color values for the square indicator
     const getSquareColor = () => {
         switch (iconColor) {
@@ -20,6 +54,20 @@ export function StatCard({ label, value, iconColor = 'primary', className = '' }
         }
     };
 
+    // 값 포맷팅 (원래 형식 유지)
+    const formatValue = () => {
+        if (parsed.type === 'number') {
+            return formatCompactNumber(animatedValue);
+        }
+        if (parsed.type === 'suffix') {
+            return `${animatedValue}${parsed.suffix}`;
+        }
+        if (parsed.type === 'ratio') {
+            return `${formatCompactNumber(animatedFirst)} / ${parsed.second}`;
+        }
+        return parsed.value;
+    };
+
     return (
         <div className={`stat-card-new ${className}`}>
             {/* Label with purple square indicator */}
@@ -33,7 +81,7 @@ export function StatCard({ label, value, iconColor = 'primary', className = '' }
 
             {/* Large numerical value */}
             <div className="stat-card-new__value">
-                {typeof value === 'number' ? formatCompactNumber(value) : value}
+                {formatValue()}
             </div>
         </div>
     );

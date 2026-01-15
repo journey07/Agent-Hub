@@ -4,7 +4,37 @@ import { useAgents } from '../../context/AgentContext';
 import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo } from 'react';
+import { useCountUp } from '../../utils/useCountUp';
 import './AgentDetailPage.css';
+
+// Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
+function TaskPerformanceItem({ task }) {
+    const animatedPeriod = useCountUp(task.period || 0, 800);
+    
+    return (
+        <div className="task-item-premium">
+            <div className="task-info-top">
+                <div className="task-name-group">
+                    <div className="task-icon-box">{task.icon}</div>
+                    <span className="task-name-text">{task.name}</span>
+                </div>
+                <div className="task-count-group">
+                    <span className="task-today-val">{animatedPeriod}</span>
+                    <span className="task-total-val">{task.total} total</span>
+                </div>
+            </div>
+            <div className="task-progress-bg">
+                <div
+                    className="task-progress-bar"
+                    style={{
+                        width: `${Math.min(100, (task.period / (task.total || 1)) * 100)}%`,
+                        backgroundColor: task.color
+                    }}
+                />
+            </div>
+        </div>
+    );
+}
 
 export function AgentDetailPage() {
     const { id } = useParams();
@@ -15,6 +45,12 @@ export function AgentDetailPage() {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'logs'
     const [chartTimeRange, setChartTimeRange] = useState('today'); // 'today' (others disabled for now)
     // Auto-scroll logic removed as logs are ordered newest-first (top)
+
+    // 숫자 카운트업 애니메이션 (모든 훅을 조건부 return 전에 호출)
+    const animatedTodayTasks = useCountUp(agent?.todayTasks || 0, 800);
+    const animatedTodayApiCalls = useCountUp(agent?.todayApiCalls || 0, 800);
+    const animatedAvgResponseTime = useCountUp(agent?.avgResponseTime || 0, 800, 0);
+    const animatedSuccessRate = useCountUp(agent?.apiStatus === 'error' ? 0 : ((1 - (agent?.errorRate || 0)) * 100), 800, 1);
 
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
@@ -36,11 +72,18 @@ export function AgentDetailPage() {
         if (!agent) return [];
 
         if (chartTimeRange === 'today') {
-            // Hourly - Today
-            // hourlyStats를 맵으로 변환하여 빠른 조회
+            // Hourly - Today (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
+            const todayKorea = getTodayInKoreaString();
+            
+            // hourlyStats를 맵으로 변환하여 빠른 조회 (오늘 날짜만)
             const statsMap = new Map();
             if (agent.hourlyStats && Array.isArray(agent.hourlyStats)) {
                 agent.hourlyStats.forEach(stat => {
+                    // 오늘 날짜가 아닌 데이터는 제외 (24시 리셋)
+                    if (stat.updated_at && stat.updated_at !== todayKorea) {
+                        return;
+                    }
+                    
                     const hour = stat.hour || stat.hour_key || stat.h;
                     if (hour !== undefined && hour !== null) {
                         const hourStr = String(hour).padStart(2, '0');
@@ -359,7 +402,7 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Today Tasks</div>
-                        <div className="kpi-value">{formatNumber(agent.todayTasks)}</div>
+                        <div className="kpi-value">{formatNumber(animatedTodayTasks)}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Total: {formatNumber(agent.totalTasks || Object.values(agent.apiBreakdown || {}).reduce((acc, v) => acc + (v.total || 0), 0))}
                         </div>
@@ -372,7 +415,7 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Today API Calls</div>
-                        <div className="kpi-value">{formatNumber(agent.todayApiCalls)}</div>
+                        <div className="kpi-value">{formatNumber(animatedTodayApiCalls)}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Total: {formatNumber(agent.totalApiCalls)}
                         </div>
@@ -385,7 +428,7 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Avg Latency</div>
-                        <div className="kpi-value">{agent.avgResponseTime || 0}<span style={{ fontSize: '1rem', fontWeight: 600 }}>ms</span></div>
+                        <div className="kpi-value">{animatedAvgResponseTime}<span style={{ fontSize: '1rem', fontWeight: 600 }}>ms</span></div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Real-time stats
                         </div>
@@ -399,7 +442,7 @@ export function AgentDetailPage() {
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Success Rate</div>
                         <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
-                            {agent.apiStatus === 'error' ? '0.0%' : `${((1 - (agent.errorRate || 0)) * 100).toFixed(1)}%`}
+                            {agent.apiStatus === 'error' ? '0.0%' : `${animatedSuccessRate.toFixed(1)}%`}
                         </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}
@@ -562,27 +605,7 @@ export function AgentDetailPage() {
                         </div>
                         <div className="task-performance-list" style={{ flex: 1 }}>
                             {taskPerformanceData.map(task => (
-                                <div key={task.id} className="task-item-premium">
-                                    <div className="task-info-top">
-                                        <div className="task-name-group">
-                                            <div className="task-icon-box">{task.icon}</div>
-                                            <span className="task-name-text">{task.name}</span>
-                                        </div>
-                                        <div className="task-count-group">
-                                            <span className="task-today-val">{task.period}</span>
-                                            <span className="task-total-val">{task.total} total</span>
-                                        </div>
-                                    </div>
-                                    <div className="task-progress-bg">
-                                        <div
-                                            className="task-progress-bar"
-                                            style={{
-                                                width: `${Math.min(100, (task.today / (task.total || 1)) * 100)}%`,
-                                                backgroundColor: task.color
-                                            }}
-                                        />
-                                    </div>
-                                </div>
+                                <TaskPerformanceItem key={task.id} task={task} />
                             ))}
                         </div>
                     </div>

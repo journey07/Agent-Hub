@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getTodayInKoreaString } from '../utils/formatters';
 
 /**
  * Fetch recent activity logs for all agents
@@ -99,23 +100,28 @@ export async function getSingleAgent(agentId) {
             breakdown: row.breakdown || {}
         }));
 
-        // Fetch hourly stats
+        // Fetch hourly stats (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
+        const todayKorea = getTodayInKoreaString();
+        
         const { data: hourlyStats } = await supabase
             .from('hourly_stats')
-            .select('hour, tasks, api_calls')
+            .select('hour, tasks, api_calls, updated_at')
             .eq('agent_id', agentId)
+            .eq('updated_at', todayKorea)
             .order('hour');
 
         const hourlyData = (hourlyStats && hourlyStats.length > 0)
             ? hourlyStats.map(row => ({
                 hour: row.hour,
                 tasks: row.tasks,
-                apiCalls: row.api_calls
+                apiCalls: row.api_calls,
+                updated_at: row.updated_at  // 오늘 날짜 필터링용
             }))
             : Array.from({ length: 24 }, (_, i) => ({
                 hour: i.toString().padStart(2, '0'),
                 tasks: 0,
-                apiCalls: 0
+                apiCalls: 0,
+                updated_at: todayKorea
             }));
 
         // Fetch activity logs (last 50)
@@ -208,23 +214,28 @@ export async function getAllAgents() {
                 breakdown: row.breakdown || {}
             }));
 
-            // Fetch hourly stats
+            // Fetch hourly stats (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
+            const todayKorea = getTodayInKoreaString();
+            
             const { data: hourlyStats } = await supabase
                 .from('hourly_stats')
-                .select('hour, tasks, api_calls')
+                .select('hour, tasks, api_calls, updated_at')
                 .eq('agent_id', agentId)
+                .eq('updated_at', todayKorea)
                 .order('hour');
 
             const hourlyData = (hourlyStats && hourlyStats.length > 0)
                 ? hourlyStats.map(row => ({
                     hour: row.hour,
                     tasks: row.tasks,
-                    apiCalls: row.api_calls
+                    apiCalls: row.api_calls,
+                    updated_at: row.updated_at  // 오늘 날짜 필터링용
                 }))
                 : Array.from({ length: 24 }, (_, i) => ({
                     hour: i.toString().padStart(2, '0'),
                     tasks: 0,
-                    apiCalls: 0
+                    apiCalls: 0,
+                    updated_at: todayKorea
                 }));
 
             // Fetch activity logs (last 50)

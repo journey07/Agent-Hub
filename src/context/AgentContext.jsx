@@ -3,45 +3,19 @@ import { clients } from '../data/mockData';
 import { getAllAgents, getSingleAgent, getRecentActivityLogs, updateAgentStats, checkAgentHealth } from '../services/agentService';
 import { supabase } from '../lib/supabase';
 import { safeAsync, safeAsyncWithRetry, getUserFriendlyMessage } from '../utils/errorHandler';
-import { getTodayInKorea } from '../utils/formatters';
+import { getTodayInKorea, getTodayInKoreaString } from '../utils/formatters';
 import { useAuth } from './AuthContext';
 
 const AgentContext = createContext(null);
 
 export function AgentProvider({ children }) {
-    // 최상단에 강제 로그 (항상 실행되는지 확인)
-    console.log('🚨🚨🚨 [AgentProvider] 컴포넌트 렌더링 시작 🚨🚨🚨');
-    
     const { session, isAuthenticated } = useAuth();
-    console.log('🚨🚨🚨 [AgentProvider] useAuth() 호출 완료:', { 
-        isAuthenticated, 
-        hasSession: !!session,
-        userEmail: session?.user?.email || 'None'
-    });
     
     const [agents, setAgents] = useState([]);
     const [activityLogs, setActivityLogs] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    
-    // 디버깅: 인증 상태 로깅
-    useEffect(() => {
-        console.log('🔍 [AgentContext] 인증 상태 변경:', {
-            isAuthenticated,
-            hasSession: !!session,
-            userEmail: session?.user?.email || 'None',
-            sessionId: session?.user?.id || 'None'
-        });
-    }, [isAuthenticated, session]);
-    
-    // 디버깅: 컴포넌트 마운트 확인
-    useEffect(() => {
-        console.log('🚨🚨🚨 [AgentContext] 컴포넌트 마운트됨 🚨🚨🚨');
-        return () => {
-            console.log('🔍 [AgentContext] 컴포넌트 언마운트됨');
-        };
-    }, []);
 
     // Calculate real-time stats
     const calculateStats = (currentAgents) => {
@@ -110,9 +84,7 @@ export function AgentProvider({ children }) {
         });
 
         if (totalDataPoints === 0) {
-            console.warn('⚠️ No daily_stats data found for chart. Make sure update_agent_stats function includes daily_stats updates.');
-        } else {
-            console.log(`📊 Aggregated ${totalDataPoints} daily stats data points for weekly chart`);
+            console.warn('⚠️ No daily_stats data found for chart.');
         }
 
         // Convert to array and ensure all 7 days are present
@@ -133,6 +105,7 @@ export function AgentProvider({ children }) {
     };
 
     // Calculate hourly traffic data (today) from all agents' hourly_stats
+    // 오늘 날짜(한국 시간대)의 데이터만 집계 - 24시 리셋
     const calculateHourlyTraffic = (currentAgents) => {
         // Initialize 24 hours with zeros
         const hourlyAggregates = new Map();
@@ -145,10 +118,18 @@ export function AgentProvider({ children }) {
             });
         }
 
-        // Sum up stats from all agents' hourlyStats
+        // 오늘 날짜 (한국 시간대 기준)
+        const todayKorea = getTodayInKoreaString();
+
+        // Sum up stats from all agents' hourlyStats (오늘 날짜만)
         currentAgents.forEach(agent => {
             if (agent.hourlyStats && Array.isArray(agent.hourlyStats)) {
                 agent.hourlyStats.forEach(hourData => {
+                    // 오늘 날짜가 아닌 데이터는 제외 (24시 리셋)
+                    if (hourData.updated_at && hourData.updated_at !== todayKorea) {
+                        return;
+                    }
+                    
                     // Ensure hour is a string in '00'-'23' format
                     let hourStr = hourData.hour;
                     if (hourStr === null || hourStr === undefined) {
@@ -223,6 +204,60 @@ export function AgentProvider({ children }) {
         fetchInitialData();
     }, [refreshAllData]);
 
+    // 자정(00:00) 감지 및 자동 리셋
+    // 한국 시간대 기준으로 날짜가 바뀌면 DB를 즉시 리셋하고 데이터 새로고침
+    useEffect(() => {
+        // 초기 날짜 저장
+        const todayKorea = getTodayInKoreaString();
+        const lastCheckedDateKey = 'dashboard_last_checked_date';
+        const storedDate = localStorage.getItem(lastCheckedDateKey);
+        
+        if (!storedDate) {
+            localStorage.setItem(lastCheckedDateKey, todayKorea);
+        }
+
+        // 1분마다 날짜 체크 (자정 감지)
+        const midnightCheckInterval = setInterval(async () => {
+            const currentDateKorea = getTodayInKoreaString();
+            const lastCheckedDate = localStorage.getItem(lastCheckedDateKey);
+
+            // 날짜가 바뀌었으면 (자정이 지났으면)
+            if (lastCheckedDate && lastCheckedDate !== currentDateKorea) {
+                console.log('🔄 자정 감지! 날짜가 바뀌었습니다:', {
+                    이전날짜: lastCheckedDate,
+                    새날짜: currentDateKorea
+                });
+                console.log('📊 DB 리셋 및 데이터 새로고침 중...');
+
+                try {
+                    // 1. DB에서 즉시 리셋 (모든 에이전트의 today 통계 리셋)
+                    const { error: resetError } = await supabase.rpc('reset_today_stats_for_all_agents');
+                    
+                    if (resetError) {
+                        console.error('❌ DB 리셋 실패:', resetError);
+                        // 리셋 실패해도 데이터 새로고침은 진행
+                    } else {
+                        console.log('✅ DB 리셋 완료! 모든 today 통계가 0으로 초기화되었습니다.');
+                    }
+
+                    // 2. 데이터 새로고침 (리셋된 데이터 가져오기)
+                    await refreshAllData();
+
+                    // 3. 날짜 업데이트
+                    localStorage.setItem(lastCheckedDateKey, currentDateKorea);
+
+                    console.log('✅ 자정 리셋 완료! 새로운 날의 데이터가 표시됩니다.');
+                } catch (error) {
+                    console.error('❌ 자정 리셋 중 오류:', error);
+                    // 오류가 나도 날짜는 업데이트 (다음 체크에서 다시 시도)
+                    localStorage.setItem(lastCheckedDateKey, currentDateKorea);
+                }
+            }
+        }, 60000); // 1분마다 체크
+
+        return () => clearInterval(midnightCheckInterval);
+    }, [refreshAllData]);
+
     // Optimized polling: Refresh data every 5 seconds
     // 차트와 통계만 업데이트 (경량화)
     const refreshStatsOnly = useCallback(async () => {
@@ -242,9 +277,13 @@ export function AgentProvider({ children }) {
                     .select('agent_id, date, tasks, api_calls')
                     .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // 최근 7일만
 
+                // 오늘 날짜만 가져오기 (한국 시간대 기준, 24시 리셋)
+                const todayKorea = getTodayInKoreaString();
+                
                 const { data: allHourlyStats } = await supabase
                     .from('hourly_stats')
-                    .select('agent_id, hour, tasks, api_calls');
+                    .select('agent_id, hour, tasks, api_calls, updated_at')
+                    .eq('updated_at', todayKorea);
 
                 // 로그도 함께 가져오기 (Realtime 실패 시 대비)
                 const logsResult = await getRecentActivityLogs(100);
@@ -275,7 +314,8 @@ export function AgentProvider({ children }) {
                         hourlyStats: agentHourlyStats.map(s => ({
                             hour: s.hour,
                             apiCalls: s.api_calls,
-                            tasks: s.tasks
+                            tasks: s.tasks,
+                            updated_at: s.updated_at  // 오늘 날짜 필터링용
                         }))
                     };
                 });
@@ -308,18 +348,14 @@ export function AgentProvider({ children }) {
 
     // Fallback polling: Realtime이 완전히 실패할 경우를 대비한 백업 (연결이 끊어졌을 때만)
     useEffect(() => {
-        // Realtime이 연결되어 있으면 polling 불필요 - WebSocket으로 실시간 업데이트
         if (isConnected) {
-            console.log('✅ Realtime 연결됨 - WebSocket으로 실시간 업데이트 중');
             return;
         }
 
         // Realtime이 끊어졌을 때만 fallback으로 주기적 업데이트 (30초마다)
-        console.warn('⚠️ Realtime 연결 끊어짐 - Fallback polling 활성화 (30초마다)');
         const fallbackIntervalId = setInterval(() => {
-            console.warn('⚠️ Fallback polling 실행 중... (Realtime 연결 복구 대기)');
             refreshStatsOnly();
-        }, 30000); // 30초마다 백업 업데이트
+        }, 30000);
 
         return () => clearInterval(fallbackIntervalId);
     }, [isConnected, refreshStatsOnly]);
@@ -463,40 +499,13 @@ export function AgentProvider({ children }) {
         }, 300);
     }, []);
 
-    // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
+    // WebSocket 기반 완전 실시간 업데이트
     // 인증 상태가 변경될 때마다 Realtime 구독 재설정
     useEffect(() => {
-        // 강제로 콘솔에 출력 (항상 실행되는지 확인)
-        console.log('🚨🚨🚨 [Realtime Setup] useEffect 실행됨 🚨🚨🚨');
-        console.log('🔍 [Realtime Setup] 인증 상태:', { 
-            isAuthenticated, 
-            hasSession: !!session,
-            sessionUser: session?.user?.email || 'None',
-            sessionId: session?.user?.id || 'None'
-        });
-        
-        // 직접 Supabase에서 세션 확인 (이중 체크)
-        supabase.auth.getSession().then(({ data: { session: directSession }, error }) => {
-            console.log('🔍 [Realtime Setup] 직접 세션 확인:', {
-                hasDirectSession: !!directSession,
-                directUser: directSession?.user?.email || 'None',
-                error: error?.message || 'None'
-            });
-        });
-        
-        // 로그인하지 않았으면 Realtime 구독하지 않음
         if (!isAuthenticated || !session) {
-            console.log('⏸️ 로그인하지 않음 - Realtime 구독 대기 중...');
-            console.log('💡 로그인 후 자동으로 Realtime 구독이 시작됩니다.');
-            console.log('💡 현재 상태:', { isAuthenticated, session: session ? '있음' : '없음' });
             setIsConnected(false);
             return;
         }
-        
-        console.log('📡 Setting up WebSocket Realtime for instant updates...');
-        console.log('🔍 Realtime 구독 설정 시작...');
-        console.log('✅ 인증됨 - 사용자:', session.user?.email || 'Unknown');
-        console.log('✅ Realtime 이벤트를 받을 수 있습니다 (RLS 정책 통과)');
         
         // 전역 변수로 테스트 함수 노출 (브라우저 콘솔에서 사용)
         if (typeof window !== 'undefined') {
@@ -633,34 +642,15 @@ export function AgentProvider({ children }) {
                 };
             };
             
-            console.log('💡 테스트: 브라우저 콘솔에서 다음 명령어 실행:');
-            console.log('   - testRealtimeInsert() : Realtime INSERT 테스트');
-            console.log('   - checkAuthStatus() : 인증 상태 확인');
-            console.log('   - diagnoseRealtime() : 완전 진단 (추천!)');
         }
 
-        // Use a single channel for all dashboard updates to avoid connection limits/race conditions
-        console.log('🔍 [Realtime] Channel 생성 시작...');
+        // Use a single channel for all dashboard updates
         const channel = supabase
         .channel('dashboard-realtime', {
             config: {
                 broadcast: { self: true },
                 presence: { key: '' }
             }
-        })
-        
-        // 모든 이벤트를 로깅 (디버깅용)
-        .on('broadcast', { event: '*' }, (payload) => {
-            console.log('📡 [DEBUG] Broadcast 이벤트:', payload);
-        })
-        .on('presence', { event: '*' }, (payload) => {
-            console.log('📡 [DEBUG] Presence 이벤트:', payload);
-        })
-        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-            console.log('🚨🚨🚨 [DEBUG] Postgres 변경 감지 (모든 이벤트) 🚨🚨🚨');
-            console.log('📡 이벤트 타입:', payload.eventType);
-            console.log('📡 테이블:', payload.table);
-            console.log('📡 전체 Payload:', payload);
         })
         .on(
             'postgres_changes',
@@ -671,9 +661,7 @@ export function AgentProvider({ children }) {
                 filter: undefined  // 명시적으로 필터 없음
             },
                 async (payload) => {
-                    console.log('⚡ 실시간 업데이트:', payload.eventType, payload.new?.id || payload.old?.id);
-                    
-                    // 즉시 업데이트 - 홈쇼핑처럼!
+                    // 즉시 업데이트
                     if (payload.eventType === 'UPDATE' && payload.new?.id) {
                         // 에이전트 통계 변경 시 즉시 반영
                         const updatedAgent = payload.new;
@@ -728,41 +716,17 @@ export function AgentProvider({ children }) {
                 filter: undefined  // 명시적으로 필터 없음
             },
             (payload) => {
-                console.log('🎯🎯🎯🎯🎯 activity_logs 이벤트 핸들러 실행! 🎯🎯🎯🎯🎯');
-                console.log('🚨🚨🚨 이 메시지가 보이면 Realtime이 작동하는 것입니다! 🚨🚨🚨');
-                console.log('📡 이벤트 타입:', payload.eventType);
-                const receivedTime = Date.now();
-                const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
-                const delay = receivedTime - logTimestamp;
-                
-                console.log('⚡⚡⚡⚡⚡ 실시간 로그 이벤트 수신! ⚡⚡⚡⚡⚡');
-                console.log('📦 Payload:', payload);
-                console.log('📦 payload.new:', payload.new);
-                console.log(`⏱️ 지연 시간: ${delay}ms (${(delay / 1000).toFixed(2)}초)`);
-                console.log('Payload 전체:', JSON.stringify(payload, null, 2));
-                
-                if (delay > 2000) {
-                    console.error(`❌ 심각한 지연 감지: ${delay}ms - Realtime이 제대로 작동하지 않을 수 있습니다!`);
-                }
-                
                 // INSERT 이벤트만 처리
                 if (payload.eventType === 'INSERT' && payload.new) {
                     const newLog = payload.new;
-                    console.log('새 로그 데이터 (INSERT):', newLog);
                     
-                    // 에이전트 이름을 가져오기 위해 현재 agents 상태 사용
-                    // 함수형 업데이트로 최신 상태 참조
                     setActivityLogs(prev => {
                         // 중복 체크
                         if (prev.some(log => log.id === newLog.id)) {
-                            console.log('로그 중복, 스킵:', newLog.id);
                             return prev;
                         }
                         
-                        // agents 상태에서 에이전트 이름 찾기
-                        // 주의: 이 방법은 클로저 문제가 있을 수 있으므로
-                        // 에이전트 이름은 나중에 업데이트하거나 기본값 사용
-                        const agentName = newLog.agent_id; // 일단 ID 사용, 나중에 업데이트
+                        const agentName = newLog.agent_id;
                         
                         const newLogEntry = {
                             id: newLog.id,
@@ -774,8 +738,6 @@ export function AgentProvider({ children }) {
                             timestamp: newLog.timestamp || new Date().toISOString(),
                             responseTime: newLog.response_time || 0
                         };
-                        
-                        console.log('✅ 새 로그 UI에 추가:', newLogEntry);
                         
                         // 최신 로그를 맨 위에 추가하고 최대 100개만 유지
                         const updated = [newLogEntry, ...prev].slice(0, 100);
@@ -802,13 +764,6 @@ export function AgentProvider({ children }) {
                     if (newLog.agent_id) {
                         queueAgentUpdate(newLog.agent_id);
                     }
-                } else {
-                    console.log('⚠️ INSERT가 아닌 이벤트 또는 payload.new 없음:', {
-                        eventType: payload.eventType,
-                        hasNew: !!payload.new,
-                        hasOld: !!payload.old,
-                        payload
-                    });
                 }
             }
         )
@@ -821,8 +776,6 @@ export function AgentProvider({ children }) {
                 filter: undefined
             },
             async (payload) => {
-                console.log('📡 API breakdown changed:', payload.eventType);
-                
                 // API breakdown change means agent stats changed
                 if (payload.new?.agent_id) {
                     queueAgentUpdate(payload.new.agent_id);
@@ -840,8 +793,6 @@ export function AgentProvider({ children }) {
                     filter: undefined
                 },
                 async (payload) => {
-                    console.log('📡 Daily stats changed (실시간):', payload.eventType, payload.new);
-                    
                     // Daily stats 변경 시 즉시 차트 업데이트
                     if (payload.new?.agent_id) {
                         // 해당 에이전트만 업데이트하고 차트 재계산
@@ -865,8 +816,6 @@ export function AgentProvider({ children }) {
                     filter: undefined
                 },
                 async (payload) => {
-                    console.log('📡 Hourly stats changed (실시간):', payload.eventType, payload.new);
-                    
                     // Hourly stats 변경 시 즉시 차트 업데이트
                     if (payload.new?.agent_id) {
                         // 해당 에이전트만 업데이트하고 차트 재계산
@@ -882,76 +831,24 @@ export function AgentProvider({ children }) {
                 }
             )
             .subscribe(async (status, err) => {
-                console.log(`🚨🚨🚨 Realtime 구독 상태 변경: ${status} 🚨🚨🚨`, err || '');
-                
-                // 구독 파라미터 확인
-                if (channel.bindings && channel.bindings.length > 0) {
-                    console.log('📋 구독 파라미터:', channel.bindings);
-                    channel.bindings.forEach((binding, idx) => {
-                        console.log(`   ${idx + 1}. ${binding.event} - ${binding.schema}.${binding.table}`);
-                    });
-                } else {
-                    console.warn('⚠️ 구독 파라미터가 없습니다! "No subscription params" 오류의 원인일 수 있습니다.');
-                    console.warn('   → Supabase Dashboard → Database → Replication에서 테이블 확인');
-                    console.warn('   → Publication에 테이블이 추가되어 있어야 합니다');
-                }
-                
                 if (status === 'SUBSCRIBED') {
-                    console.log('✅✅✅✅✅ WebSocket Connected - 실시간 업데이트 활성화! ✅✅✅✅✅');
-                    console.log('📡 Subscribed to: agents, activity_logs, daily_stats, hourly_stats, api_breakdown');
-                    console.log('🔍 Realtime 연결 상태: SUBSCRIBED - 이제 실시간 업데이트가 작동합니다!');
-                    console.log('');
-                    console.log('🧪 테스트: 브라우저 콘솔에서 testRealtimeInsert() 실행하세요');
-                    console.log('');
-                    console.log('🔍 디버깅: Network 탭 → WebSocket 연결 확인');
-                    console.log('   - wss://...supabase.co/realtime/... 연결 확인');
-                    console.log('   - Messages 탭에서 postgres_changes 이벤트 확인');
-                    console.log('   - "No subscription params" 메시지가 있으면 Publication 문제');
-                    console.log('');
                     setIsConnected(true);
-                    
-                    // 구독 성공 후 즉시 테스트 INSERT 실행 (자동 테스트)
-                    setTimeout(async () => {
-                        console.log('🧪 자동 테스트: 3초 후 testRealtimeInsert() 실행...');
-                        if (window.testRealtimeInsert) {
-                            console.log('🧪 testRealtimeInsert() 실행 중...');
-                            await window.testRealtimeInsert();
-                            console.log('🧪 testRealtimeInsert() 완료 - 이제 Realtime 이벤트가 와야 합니다');
-                            console.log('');
-                            console.log('💡💡💡 중요: 이벤트가 오지 않으면 다음을 확인하세요:');
-                            console.log('   1. Supabase SQL Editor에서 test_realtime_direct.sql 실행');
-                            console.log('      - RLS 정책 수정 (anon, authenticated 모두 허용)');
-                            console.log('      - REPLICA IDENTITY FULL 설정');
-                            console.log('   2. Network 탭 → WebSocket → Messages 확인');
-                            console.log('      - postgres_changes 이벤트가 오는지 확인');
-                            console.log('   3. Supabase Dashboard → Database → Replication 확인');
-                            console.log('      - activity_logs 테이블이 목록에 있는지 확인');
-                            console.log('');
-                        }
-                    }, 3000);
                 } else if (status === 'CLOSED') {
-                    console.error('❌ WebSocket Disconnected - Realtime이 끊어졌습니다!');
-                    console.error('⚠️ 이제 fallback polling (30초마다)만 작동합니다.');
+                    console.error('❌ Realtime 연결 끊어짐');
                     setIsConnected(false);
                 } else if (status === 'CHANNEL_ERROR') {
-                    console.error('⚠️ WebSocket Channel Error:', err);
-                    console.error('❌ Realtime 구독 실패 - fallback polling으로 전환됩니다.');
+                    console.error('❌ Realtime 구독 실패:', err);
                     setIsConnected(false);
                 } else if (status === 'TIMED_OUT') {
-                    console.error('⏱️ WebSocket Connection Timeout - Realtime 연결 시간 초과!');
+                    console.error('⏱️ Realtime 연결 시간 초과');
                     setIsConnected(false);
-                } else {
-                    console.log('📡 WebSocket Status:', status, err);
-                    if (status !== 'SUBSCRIBED') {
-                        console.warn(`⚠️ Realtime 상태가 SUBSCRIBED가 아닙니다: ${status}`);
-                        setIsConnected(false);
-                    }
+                } else if (status !== 'SUBSCRIBED') {
+                    setIsConnected(false);
                 }
             });
 
         // Cleanup subscriptions on unmount or auth change
         return () => {
-            console.log('🔌 Cleaning up WebSocket subscriptions');
             if (updateTimerRef.current) {
                 clearTimeout(updateTimerRef.current);
             }

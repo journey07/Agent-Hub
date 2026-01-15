@@ -1,16 +1,18 @@
--- Update the update_agent_stats function to include daily_stats updates
--- 한국 시간대 기준 자정(00:00)에 today 통계 자동 리셋 기능 포함
--- Run this in your Supabase SQL Editor
+-- ============================================
+-- Migration: Add daily reset functionality for today stats
+-- 한국 시간대 기준 자정(00:00)에 today 통계 자동 리셋
+-- ============================================
 
--- 먼저 agents 테이블에 last_reset_date 필드 추가 (없는 경우)
+-- 1. agents 테이블에 last_reset_date 필드 추가
 ALTER TABLE agents 
 ADD COLUMN IF NOT EXISTS last_reset_date DATE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE;
 
--- 기존 데이터의 last_reset_date를 오늘 날짜로 설정
+-- 2. 기존 데이터의 last_reset_date를 오늘 날짜로 설정
 UPDATE agents 
 SET last_reset_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE
 WHERE last_reset_date IS NULL;
 
+-- 3. update_agent_stats 함수 수정: 날짜가 바뀌면 자동 리셋
 CREATE OR REPLACE FUNCTION update_agent_stats(
     p_agent_id TEXT,
     p_api_type TEXT,
@@ -50,6 +52,10 @@ BEGIN
         UPDATE api_breakdown
         SET today_count = 0
         WHERE agent_id = p_agent_id;
+
+        -- hourly_stats 테이블의 오늘 날짜가 아닌 데이터는 유지하되, 
+        -- updated_at이 오늘이 아닌 경우는 리셋하지 않음 (시간별 통계는 누적)
+        -- 대신 오늘 날짜의 hourly_stats만 업데이트하도록 함
     END IF;
 
     -- Update agent counters (리셋 후 증가)
@@ -74,7 +80,7 @@ BEGIN
         today_count = api_breakdown.today_count + 1,
         total_count = api_breakdown.total_count + 1;
 
-    -- Update hourly stats (오늘 날짜 기준, 날짜가 바뀌면 리셋)
+    -- Update hourly stats (오늘 날짜 기준)
     INSERT INTO hourly_stats (agent_id, hour, tasks, api_calls, updated_at)
     VALUES (
         p_agent_id,
@@ -113,3 +119,32 @@ $$;
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION update_agent_stats TO authenticated, service_role;
+
+-- ============================================
+-- 수동 리셋 함수 (필요시 사용)
+-- ============================================
+CREATE OR REPLACE FUNCTION reset_today_stats_for_all_agents()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_today DATE;
+BEGIN
+    v_today := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE;
+    
+    -- 모든 에이전트의 today 통계 리셋
+    UPDATE agents
+    SET 
+        today_api_calls = 0,
+        today_tasks = 0,
+        last_reset_date = v_today;
+    
+    -- 모든 api_breakdown의 today_count 리셋
+    UPDATE api_breakdown
+    SET today_count = 0;
+    
+    -- hourly_stats는 updated_at 기준으로 자동 처리되므로 별도 리셋 불필요
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION reset_today_stats_for_all_agents TO authenticated, service_role;

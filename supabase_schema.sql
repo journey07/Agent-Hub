@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS agents (
     api_status TEXT DEFAULT 'unknown',
     base_url TEXT,
     account TEXT,
-    api_key TEXT
+    api_key TEXT,
+    last_reset_date DATE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE
 );
 
 -- ============================================
@@ -218,12 +219,34 @@ AS $$
 DECLARE
     v_today DATE;
     v_current_hour TEXT;
+    v_last_reset_date DATE;
 BEGIN
     -- Use Korean timezone for all date calculations
     v_today := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE;
     v_current_hour := TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul', 'HH24');
 
-    -- Update agent counters
+    -- 날짜가 바뀌었는지 확인하고 리셋
+    SELECT COALESCE(last_reset_date, '1970-01-01'::DATE) INTO v_last_reset_date
+    FROM agents
+    WHERE id = p_agent_id;
+
+    -- 날짜가 바뀌었으면 (자정이 지났으면) today 통계 리셋
+    IF v_last_reset_date < v_today THEN
+        -- agents 테이블의 today 통계 리셋
+        UPDATE agents
+        SET 
+            today_api_calls = 0,
+            today_tasks = 0,
+            last_reset_date = v_today
+        WHERE id = p_agent_id;
+
+        -- api_breakdown 테이블의 today_count 리셋
+        UPDATE api_breakdown
+        SET today_count = 0
+        WHERE agent_id = p_agent_id;
+    END IF;
+
+    -- Update agent counters (리셋 후 증가)
     UPDATE agents
     SET 
         last_active = NOW(),
@@ -233,7 +256,8 @@ BEGIN
         today_tasks = today_tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         total_response_time = total_response_time + p_response_time,
         response_count = response_count + 1,
-        avg_response_time = (total_response_time + p_response_time) / (response_count + 1)
+        avg_response_time = (total_response_time + p_response_time) / (response_count + 1),
+        last_reset_date = v_today  -- 항상 오늘 날짜로 업데이트
     WHERE id = p_agent_id;
 
     -- Update API breakdown
@@ -244,7 +268,7 @@ BEGIN
         today_count = api_breakdown.today_count + 1,
         total_count = api_breakdown.total_count + 1;
 
-    -- Update hourly stats
+    -- Update hourly stats (오늘 날짜 기준, 날짜가 바뀌면 리셋)
     INSERT INTO hourly_stats (agent_id, hour, tasks, api_calls, updated_at)
     VALUES (
         p_agent_id,
@@ -255,15 +279,22 @@ BEGIN
     )
     ON CONFLICT (agent_id, hour) DO UPDATE
     SET 
-        tasks = hourly_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
-        api_calls = hourly_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
+        -- updated_at이 오늘이 아니면 리셋 후 증가, 오늘이면 증가만
+        tasks = CASE 
+            WHEN hourly_stats.updated_at < v_today THEN CASE WHEN p_should_count_task THEN 1 ELSE 0 END
+            ELSE hourly_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END
+        END,
+        api_calls = CASE 
+            WHEN hourly_stats.updated_at < v_today THEN CASE WHEN p_should_count_api THEN 1 ELSE 0 END
+            ELSE hourly_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END
+        END,
         updated_at = v_today;
 
     -- Update daily stats (using Korean timezone date)
     INSERT INTO daily_stats (agent_id, date, tasks, api_calls)
     VALUES (
         p_agent_id,
-        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE,
+        v_today,
         CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         CASE WHEN p_should_count_api THEN 1 ELSE 0 END
     )
@@ -276,3 +307,32 @@ $$;
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION update_agent_stats TO authenticated, service_role;
+
+-- ============================================
+-- 수동 리셋 함수 (필요시 사용)
+-- ============================================
+CREATE OR REPLACE FUNCTION reset_today_stats_for_all_agents()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_today DATE;
+BEGIN
+    v_today := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE;
+    
+    -- 모든 에이전트의 today 통계 리셋
+    UPDATE agents
+    SET 
+        today_api_calls = 0,
+        today_tasks = 0,
+        last_reset_date = v_today;
+    
+    -- 모든 api_breakdown의 today_count 리셋
+    UPDATE api_breakdown
+    SET today_count = 0;
+    
+    -- hourly_stats는 updated_at 기준으로 자동 처리되므로 별도 리셋 불필요
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION reset_today_stats_for_all_agents TO authenticated, service_role;
