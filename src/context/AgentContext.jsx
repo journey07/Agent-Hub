@@ -3,6 +3,7 @@ import { clients } from '../data/mockData';
 import { getAllAgents, getSingleAgent, getRecentActivityLogs, updateAgentStats, checkAgentHealth } from '../services/agentService';
 import { supabase } from '../lib/supabase';
 import { safeAsync, safeAsyncWithRetry, getUserFriendlyMessage } from '../utils/errorHandler';
+import { getTodayInKorea } from '../utils/formatters';
 import { useAuth } from './AuthContext';
 
 const AgentContext = createContext(null);
@@ -59,8 +60,8 @@ export function AgentProvider({ children }) {
 
     // Calculate weekly API usage data (last 7 days) from all agents' daily_stats
     const calculateWeeklyApiUsage = (currentAgents) => {
-        // Get last 7 days dates using Korean timezone
-        const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+        // Get last 7 days dates using Korean timezone (24시 기준 = 자정 00:00)
+        const today = getTodayInKorea();
         const dates = [];
         for (let i = 6; i >= 0; i--) {
             const date = new Date(today);
@@ -550,7 +551,10 @@ export function AgentProvider({ children }) {
             console.log('📡 [DEBUG] Presence 이벤트:', payload);
         })
         .on('postgres_changes', { event: '*' }, (payload) => {
-            console.log('📡 [DEBUG] Postgres 변경 감지 (모든 이벤트):', payload.eventType, payload.table, payload);
+            console.log('🚨🚨🚨 [DEBUG] Postgres 변경 감지 (모든 이벤트) 🚨🚨🚨');
+            console.log('📡 이벤트 타입:', payload.eventType);
+            console.log('📡 테이블:', payload.table);
+            console.log('📡 전체 Payload:', payload);
         })
         .on(
             'postgres_changes',
@@ -611,14 +615,15 @@ export function AgentProvider({ children }) {
         .on(
             'postgres_changes',
             {
-                event: 'INSERT',
+                event: '*',  // INSERT, UPDATE, DELETE 모두 구독
                 schema: 'public',
                 table: 'activity_logs'
-                // filter 제거 - 모든 INSERT 이벤트 구독
+                // filter 제거 - 모든 이벤트 구독
             },
             (payload) => {
-                console.log('🎯🎯🎯🎯🎯 activity_logs INSERT 이벤트 핸들러 실행! 🎯🎯🎯🎯🎯');
+                console.log('🎯🎯🎯🎯🎯 activity_logs 이벤트 핸들러 실행! 🎯🎯🎯🎯🎯');
                 console.log('🚨🚨🚨 이 메시지가 보이면 Realtime이 작동하는 것입니다! 🚨🚨🚨');
+                console.log('📡 이벤트 타입:', payload.eventType);
                 const receivedTime = Date.now();
                 const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
                 const delay = receivedTime - logTimestamp;
@@ -633,9 +638,10 @@ export function AgentProvider({ children }) {
                     console.error(`❌ 심각한 지연 감지: ${delay}ms - Realtime이 제대로 작동하지 않을 수 있습니다!`);
                 }
                 
-                if (payload.new) {
+                // INSERT 이벤트만 처리
+                if (payload.eventType === 'INSERT' && payload.new) {
                     const newLog = payload.new;
-                    console.log('새 로그 데이터:', newLog);
+                    console.log('새 로그 데이터 (INSERT):', newLog);
                     
                     // 에이전트 이름을 가져오기 위해 현재 agents 상태 사용
                     // 함수형 업데이트로 최신 상태 참조
@@ -690,7 +696,12 @@ export function AgentProvider({ children }) {
                         queueAgentUpdate(newLog.agent_id);
                     }
                 } else {
-                    console.warn('⚠️ payload.new가 없음:', payload);
+                    console.log('⚠️ INSERT가 아닌 이벤트 또는 payload.new 없음:', {
+                        eventType: payload.eventType,
+                        hasNew: !!payload.new,
+                        hasOld: !!payload.old,
+                        payload
+                    });
                 }
             }
         )
@@ -780,7 +791,19 @@ export function AgentProvider({ children }) {
                     setTimeout(async () => {
                         console.log('🧪 자동 테스트: 3초 후 testRealtimeInsert() 실행...');
                         if (window.testRealtimeInsert) {
+                            console.log('🧪 testRealtimeInsert() 실행 중...');
                             await window.testRealtimeInsert();
+                            console.log('🧪 testRealtimeInsert() 완료 - 이제 Realtime 이벤트가 와야 합니다');
+                            console.log('');
+                            console.log('💡💡💡 중요: 이벤트가 오지 않으면 다음을 확인하세요:');
+                            console.log('   1. Supabase SQL Editor에서 test_realtime_direct.sql 실행');
+                            console.log('      - RLS 정책 수정 (anon, authenticated 모두 허용)');
+                            console.log('      - REPLICA IDENTITY FULL 설정');
+                            console.log('   2. Network 탭 → WebSocket → Messages 확인');
+                            console.log('      - postgres_changes 이벤트가 오는지 확인');
+                            console.log('   3. Supabase Dashboard → Database → Replication 확인');
+                            console.log('      - activity_logs 테이블이 목록에 있는지 확인');
+                            console.log('');
                         }
                     }, 3000);
                 } else if (status === 'CLOSED') {

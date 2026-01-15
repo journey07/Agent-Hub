@@ -98,3 +98,27 @@ export function getStatusColorClass(status) {
     };
     return classes[status] || 'badge--offline';
 }
+
+/**
+ * Get today's date string (YYYY-MM-DD) in Korean timezone (Asia/Seoul)
+ * 기준: 한국 시간대 자정(00:00) 기준으로 날짜가 바뀜 (24시 기준)
+ * 
+ * @returns {string} Today's date in YYYY-MM-DD format (Korean timezone)
+ */
+export function getTodayInKoreaString() {
+    const now = new Date();
+    // 'en-CA' locale gives YYYY-MM-DD format
+    return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+}
+
+/**
+ * Get today's Date object set to midnight (00:00) in Korean timezone
+ * 기준: 한국 시간대 자정(00:00) 기준으로 날짜가 바뀜 (24시 기준)
+ * 
+ * @returns {Date} Date object representing today at midnight in Korean timezone
+ */
+export function getTodayInKorea() {
+    const todayStr = getTodayInKoreaString();
+    const [year, month, day] = todayStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}

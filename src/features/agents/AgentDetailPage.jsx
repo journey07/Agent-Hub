@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
-import { formatNumber, formatRelativeTime, formatLogTimestamp } from '../../utils/formatters';
+import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo } from 'react';
 import './AgentDetailPage.css';
@@ -75,8 +75,8 @@ export function AgentDetailPage() {
             console.log('🔍 [DEBUG] dailyHistory:', history);
 
             // Filter out existing "Today" entry from history if it exists to avoid duplication
-            // Assuming history date format is YYYY-MM-DD
-            const todayStr = new Date().toISOString().split('T')[0];
+            // Use Korean timezone (24시 기준 = 자정 00:00)
+            const todayStr = getTodayInKoreaString();
             const historyWithoutToday = history.filter(d => d.date !== todayStr);
 
             const todayStats = {
@@ -216,7 +216,8 @@ export function AgentDetailPage() {
             currentPeriodData = [agent.apiBreakdown];
         } else {
             const days = chartTimeRange === 'week' ? 7 : 30;
-            const todayStr = new Date().toISOString().split('T')[0];
+            // Use Korean timezone (24시 기준 = 자정 00:00)
+            const todayStr = getTodayInKoreaString();
 
             // dailyHistory에서 오늘 날짜 제거 (중복 방지)
             const historyWithoutToday = (agent.dailyHistory || [])
