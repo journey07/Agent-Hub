@@ -6,12 +6,36 @@ import { formatNumber, formatRelativeTime } from '../../../utils/formatters';
 
 export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
     const [resultMessage, setResultMessage] = useState(null);
+    const [isError, setIsError] = useState(false);
+    
     const handleCheck = async () => {
         if (!agent.isLiveAgent || isChecking) return;
-        const result = await onHealthCheck(agent.id);
-        if (result && result.success) {
-            setResultMessage('연결 확인');
-            setTimeout(() => setResultMessage(null), 2000);
+        
+        setResultMessage(null);
+        setIsError(false);
+        
+        try {
+            const result = await onHealthCheck(agent.id);
+            if (result) {
+                if (result.success) {
+                    setResultMessage('연결 확인');
+                    setIsError(false);
+                } else {
+                    setResultMessage(result.message || '연결 실패');
+                    setIsError(true);
+                }
+                setTimeout(() => {
+                    setResultMessage(null);
+                    setIsError(false);
+                }, 3000);
+            }
+        } catch (error) {
+            setResultMessage('체크 실패');
+            setIsError(true);
+            setTimeout(() => {
+                setResultMessage(null);
+                setIsError(false);
+            }, 3000);
         }
     };
 
@@ -73,13 +97,13 @@ export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }
                 <div className="agent-card__status-group">
                     {(agent.status === 'online' || agent.status === 'offline') ? (
                         <button
-                            className={`status-btn ${resultMessage ? 'status-btn--success' : 'status-btn--check'} ${isChecking ? 'status-btn--checking' : ''} ${agent.apiStatus === 'error' ? 'status-btn--error' : ''}`}
+                            className={`status-btn ${resultMessage && !isError ? 'status-btn--success' : isError ? 'status-btn--error' : 'status-btn--check'} ${isChecking ? 'status-btn--checking' : ''} ${agent.apiStatus === 'error' ? 'status-btn--error' : ''}`}
                             onClick={handleCheck}
                             disabled={isChecking || !agent.isLiveAgent}
                             title={agent.isLiveAgent ? "Click to check connection" : "Status check unavailable"}
                         >
                             <div className={`status-btn__icon ${isChecking ? 'animate-spin' : ''}`}>
-                                {isChecking ? <ShieldCheck size={16} /> : (resultMessage ? <CheckCircle2 size={16} /> : <ShieldCheck size={16} />)}
+                                {isChecking ? <ShieldCheck size={16} /> : (resultMessage && !isError ? <CheckCircle2 size={16} /> : <ShieldCheck size={16} />)}
                             </div>
                             <span className="status-btn__text">
                                 {isChecking ? 'CHECKING...' :

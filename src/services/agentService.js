@@ -245,12 +245,23 @@ export async function checkAgentHealth(agentId) {
     try {
         // Call the Brain Server (Vercel Function) instead of the agent directly
         // This avoids CORS issues and ensures the Supabase update happens on the server side
-        // In production, this will be the Vercel deployment URL
-        // In development, use localhost if running server.js, otherwise use relative path
-        const brainUrl = import.meta.env.VITE_BRAIN_SERVER_URL || 
-                        (import.meta.env.DEV ? 'http://localhost:5001' : '/api');
+        // In production, use relative path. In development, use localhost if running server.js
+        const isDev = import.meta.env.DEV;
+        const brainServerUrl = import.meta.env.VITE_BRAIN_SERVER_URL;
+        
+        let apiUrl;
+        if (brainServerUrl) {
+            // Custom Brain Server URL provided
+            apiUrl = `${brainServerUrl}/api/stats/check-manual`;
+        } else if (isDev) {
+            // Development: use localhost if server.js is running
+            apiUrl = 'http://localhost:5001/api/stats/check-manual';
+        } else {
+            // Production: use relative path (same domain)
+            apiUrl = '/api/stats/check-manual';
+        }
 
-        const response = await fetch(`${brainUrl}/api/stats/check-manual`, {
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -259,16 +270,20 @@ export async function checkAgentHealth(agentId) {
         });
 
         if (!response.ok) {
-            throw new Error(`Brain server check failed: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Brain server check failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         const data = await response.json();
         return {
             success: data.success,
-            message: data.message
+            message: data.message || (data.success ? '연결 확인됨' : '연결 실패')
         };
     } catch (error) {
         console.error('Health check error:', error);
-        return { success: false, message: error.message };
+        return { 
+            success: false, 
+            message: error.message || '상태 체크 실패' 
+        };
     }
 }
