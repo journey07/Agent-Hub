@@ -3,10 +3,12 @@ import { clients } from '../data/mockData';
 import { getAllAgents, getSingleAgent, getRecentActivityLogs, updateAgentStats, checkAgentHealth } from '../services/agentService';
 import { supabase } from '../lib/supabase';
 import { safeAsync, safeAsyncWithRetry, getUserFriendlyMessage } from '../utils/errorHandler';
+import { useAuth } from './AuthContext';
 
 const AgentContext = createContext(null);
 
 export function AgentProvider({ children }) {
+    const { session, isAuthenticated } = useAuth();
     const [agents, setAgents] = useState([]);
     const [activityLogs, setActivityLogs] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -434,14 +436,33 @@ export function AgentProvider({ children }) {
     }, []);
 
     // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
+    // 인증 상태가 변경될 때마다 Realtime 구독 재설정
     useEffect(() => {
+        // 로그인하지 않았으면 Realtime 구독하지 않음
+        if (!isAuthenticated || !session) {
+            console.log('⏸️ 로그인하지 않음 - Realtime 구독 대기 중...');
+            console.log('💡 로그인 후 자동으로 Realtime 구독이 시작됩니다.');
+            setIsConnected(false);
+            return;
+        }
+        
         console.log('📡 Setting up WebSocket Realtime for instant updates...');
         console.log('🔍 Realtime 구독 설정 시작...');
+        console.log('✅ 인증됨 - 사용자:', session.user?.email || 'Unknown');
+        console.log('✅ Realtime 이벤트를 받을 수 있습니다 (RLS 정책 통과)');
         
         // 전역 변수로 테스트 함수 노출 (브라우저 콘솔에서 사용)
         if (typeof window !== 'undefined') {
             window.testRealtimeInsert = async () => {
                 console.log('🧪 Realtime INSERT 테스트 시작...');
+                
+                // 인증 상태 확인
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    console.error('❌ 인증되지 않음 - 먼저 로그인하세요!');
+                    return;
+                }
+                
                 const { data, error } = await supabase
                     .from('activity_logs')
                     .insert({
@@ -460,12 +481,30 @@ export function AgentProvider({ children }) {
                     console.log('⏳ 이제 "⚡⚡⚡ 실시간 로그 이벤트 수신!" 메시지가 나타나야 합니다...');
                 }
             };
-            console.log('💡 테스트: 브라우저 콘솔에서 testRealtimeInsert() 실행하세요');
+            
+            window.checkAuthStatus = async () => {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                console.log('🔍 인증 상태:', session ? '✅ 인증됨' : '❌ 인증 안 됨', session?.user?.email || '');
+                return session;
+            };
+            
+            console.log('💡 테스트: 브라우저 콘솔에서 testRealtimeInsert() 또는 checkAuthStatus() 실행하세요');
         }
 
         // Use a single channel for all dashboard updates to avoid connection limits/race conditions
         const channel = supabase
         .channel('dashboard-realtime')
+        
+        // 모든 이벤트를 로깅 (디버깅용)
+        .on('broadcast', { event: '*' }, (payload) => {
+            console.log('📡 [DEBUG] Broadcast 이벤트:', payload);
+        })
+        .on('presence', { event: '*' }, (payload) => {
+            console.log('📡 [DEBUG] Presence 이벤트:', payload);
+        })
+        .on('postgres_changes', { event: '*' }, (payload) => {
+            console.log('📡 [DEBUG] Postgres 변경 감지 (모든 이벤트):', payload.eventType, payload.table, payload);
+        })
         .on(
             'postgres_changes',
             {
@@ -531,6 +570,7 @@ export function AgentProvider({ children }) {
                 // filter 제거 - 모든 INSERT 이벤트 구독
             },
             (payload) => {
+                console.log('🎯🎯🎯 activity_logs INSERT 이벤트 핸들러 실행! 🎯🎯🎯');
                 const receivedTime = Date.now();
                 const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
                 const delay = receivedTime - logTimestamp;
@@ -680,9 +720,11 @@ export function AgentProvider({ children }) {
                     console.log('📡 Subscribed to: agents, activity_logs, daily_stats, hourly_stats, api_breakdown');
                     console.log('🔍 Realtime 연결 상태: SUBSCRIBED - 이제 실시간 업데이트가 작동합니다!');
                     console.log('');
-                    console.log('🧪 테스트: Supabase Dashboard → Table Editor → activity_logs에서 수동으로 INSERT 해보세요');
-                    console.log('   또는 브라우저 콘솔에서 다음 코드 실행:');
-                    console.log('   await supabase.from("activity_logs").insert({agent_id: "agent-worldlocker-001", action: "테스트", type: "test", status: "info", timestamp: new Date().toISOString(), response_time: 0})');
+                    console.log('🧪 테스트: 브라우저 콘솔에서 testRealtimeInsert() 실행하세요');
+                    console.log('');
+                    console.log('🔍 디버깅: Network 탭 → WebSocket 연결 확인');
+                    console.log('   - wss://...supabase.co/realtime/... 연결 확인');
+                    console.log('   - Messages 탭에서 postgres_changes 이벤트 확인');
                     console.log('');
                     setIsConnected(true);
                 } else if (status === 'CLOSED') {
@@ -705,7 +747,7 @@ export function AgentProvider({ children }) {
                 }
             });
 
-        // Cleanup subscriptions on unmount
+        // Cleanup subscriptions on unmount or auth change
         return () => {
             console.log('🔌 Cleaning up WebSocket subscriptions');
             if (updateTimerRef.current) {
@@ -713,7 +755,7 @@ export function AgentProvider({ children }) {
             }
             supabase.removeChannel(channel);
         };
-    }, []); // Empty dependency array to prevent subscription recreation
+    }, [isAuthenticated, session]); // 인증 상태가 변경될 때마다 재구독
 
     // Toggle agent status (on/off)
     const toggleAgent = useCallback(async (agentId) => {

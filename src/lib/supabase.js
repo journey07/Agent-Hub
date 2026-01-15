@@ -20,7 +20,9 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     realtime: {
         params: {
             eventsPerSecond: 10
-        }
+        },
+        // Realtime 연결 디버깅
+        log_level: 'info'
     }
 });
 
