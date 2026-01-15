@@ -4,13 +4,11 @@ import { useAgents } from '../../context/AgentContext';
 import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo } from 'react';
-import { useCountUp } from '../../utils/useCountUp';
+import { AnimatedNumber } from '../../components/common';
 import './AgentDetailPage.css';
 
 // Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
 function TaskPerformanceItem({ task }) {
-    const animatedPeriod = useCountUp(task.period || 0, 1000, 0, 50);
-    
     return (
         <div className="task-item-premium">
             <div className="task-info-top">
@@ -19,7 +17,9 @@ function TaskPerformanceItem({ task }) {
                     <span className="task-name-text">{task.name}</span>
                 </div>
                 <div className="task-count-group">
-                    <span className="task-today-val">{animatedPeriod}</span>
+                    <span className="task-today-val">
+                        <AnimatedNumber value={task.period || 0} />
+                    </span>
                     <span className="task-total-val">{task.total} total</span>
                 </div>
             </div>
@@ -45,13 +45,6 @@ export function AgentDetailPage() {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'logs'
     const [chartTimeRange, setChartTimeRange] = useState('today'); // 'today' (others disabled for now)
     // Auto-scroll logic removed as logs are ordered newest-first (top)
-
-    // 숫자 카운트업 애니메이션 (모든 훅을 조건부 return 전에 호출)
-    // latency는 숫자가 자주 바뀌므로 1씩 천천히 증가하도록 (1초 duration, 50ms stepDelay)
-    const animatedTodayTasks = useCountUp(agent?.todayTasks || 0, 1000, 0, 50);
-    const animatedTodayApiCalls = useCountUp(agent?.todayApiCalls || 0, 1000, 0, 50);
-    const animatedAvgResponseTime = useCountUp(agent?.avgResponseTime || 0, 1000, 0, 50);
-    const animatedSuccessRate = useCountUp(agent?.apiStatus === 'error' ? 0 : ((1 - (agent?.errorRate || 0)) * 100), 1000, 1, 50);
 
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
@@ -363,14 +356,9 @@ export function AgentDetailPage() {
                     <div className="agent-title-group">
                         <div className="agent-title-row">
                             <h1 className="agent-name">{agent.name}</h1>
-                            <div className={`agent-status-badge ${agent.status} ${agent.apiStatus === 'error' ? 'agent-status-badge--error' : ''}`}>
-                                {agent.apiStatus === 'error' ? 'OFFLINE' : (agent.status || 'unknown').toUpperCase()}
-                            </div>
                         </div>
                         <div className="agent-meta">
                             <span>{agent.client}</span>
-                            <span className="meta-dot"></span>
-                            <span>ID: {agent.id}</span>
                         </div>
                     </div>
                 </div>
@@ -398,7 +386,9 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Today Tasks</div>
-                        <div className="kpi-value">{formatNumber(animatedTodayTasks)}</div>
+                        <div className="kpi-value">
+                            <AnimatedNumber value={agent.todayTasks || 0} formatter={formatNumber} />
+                        </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Total: {formatNumber(agent.totalTasks || Object.values(agent.apiBreakdown || {}).reduce((acc, v) => acc + (v.total || 0), 0))}
                         </div>
@@ -411,7 +401,9 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Today API Calls</div>
-                        <div className="kpi-value">{formatNumber(animatedTodayApiCalls)}</div>
+                        <div className="kpi-value">
+                            <AnimatedNumber value={agent.todayApiCalls || 0} formatter={formatNumber} />
+                        </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Total: {formatNumber(agent.totalApiCalls)}
                         </div>
@@ -424,7 +416,10 @@ export function AgentDetailPage() {
                     </div>
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Avg Latency</div>
-                        <div className="kpi-value">{animatedAvgResponseTime}<span style={{ fontSize: '1rem', fontWeight: 600 }}>ms</span></div>
+                        <div className="kpi-value">
+                            <AnimatedNumber value={agent.avgResponseTime || 0} />
+                            <span style={{ fontSize: '1rem', fontWeight: 600, marginLeft: '0.25rem' }}>ms</span>
+                        </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             Real-time stats
                         </div>
@@ -438,7 +433,17 @@ export function AgentDetailPage() {
                     <div style={{ textAlign: 'right', paddingRight: '12px' }}>
                         <div className="kpi-label">Success Rate</div>
                         <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
-                            {agent.apiStatus === 'error' ? '0.0%' : `${animatedSuccessRate.toFixed(1)}%`}
+                            {agent.apiStatus === 'error' ? (
+                                '0.0%'
+                            ) : (
+                                <>
+                                    <AnimatedNumber 
+                                        value={((1 - (agent.errorRate || 0)) * 100)} 
+                                        formatter={(val) => val.toFixed(1)}
+                                    />
+                                    %
+                                </>
+                            )}
                         </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
                             {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}

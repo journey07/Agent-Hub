@@ -1,0 +1,92 @@
+.animated-number {
+    display: inline-block;
+    position: relative;
+    vertical-align: baseline;
+}
+
+.animated-number__container {
+    display: inline-block;
+    position: relative;
+    overflow: hidden;
+    height: 1.2em; /* 한 줄 높이 */
+    line-height: 1.2em;
+}
+
+.animated-number__digit {
+    display: block;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* 위로 올라가는 애니메이션 (8 -> 9) */
+.animated-number__digit--up {
+    animation: slideUpOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animated-number__digit--next-up {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: translateY(100%);
+    animation: slideUpIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* 아래로 내려가는 애니메이션 (9 -> 8) */
+.animated-number__digit--down {
+    animation: slideDownOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animated-number__digit--next-down {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: translateY(-100%);
+    animation: slideDownIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideUpOut {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideUpIn {
+    0% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideDownOut {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideDownIn {
+    0% {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

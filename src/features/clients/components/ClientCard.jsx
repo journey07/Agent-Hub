@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, ChevronDown, Power, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCompactNumber } from '../../../utils/formatters';
-import { StatusBadge, Toggle } from '../../../components/common';
+import { StatusBadge, Toggle, AnimatedNumber } from '../../../components/common';
 import { useAgents } from '../../../context/AgentContext';
-import { useCountUp } from '../../../utils/useCountUp';
 
 export function ClientCard({ client, clientAgents, activeAgents }) {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -18,11 +17,6 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
     // Fake Health Score Calculation (for demo)
     const errorRate = clientAgents.reduce((sum, agent) => sum + (agent.errorRate || 0), 0) / (clientAgents.length || 1);
     const healthScore = Math.max(0, Math.min(100, 100 - (errorRate * 1000))); // Simple subtraction logic
-
-    // 숫자 카운트업 애니메이션 (1씩 천천히 증가)
-    const animatedHealthScore = useCountUp(healthScore, 1000, 0, 50);
-    const animatedOnlineAgents = useCountUp(onlineAgents, 1000, 0, 50);
-    const animatedTotalTodayCalls = useCountUp(totalTodayCalls, 1000, 0, 50);
 
     const getHealthColor = (score) => {
         if (score >= 90) return '#10B981'; // Emerald 500
@@ -51,7 +45,9 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
                         <div style={{ width: '140px' }}>
                             <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                                 <span>Health Score</span>
-                                <span style={{ color: getHealthColor(healthScore), fontWeight: 700 }}>{Math.round(animatedHealthScore)}</span>
+                                <span style={{ color: getHealthColor(healthScore), fontWeight: 700 }}>
+                                    <AnimatedNumber value={healthScore} formatter={(val) => Math.round(val)} />
+                                </span>
                             </div>
                             <div className="client-card__health-bar">
                                 <div
@@ -75,13 +71,14 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
                 <div className="client-card__metric">
                     <span className="client-card__metric-label">Active Agents</span>
                     <div className="client-card__metric-value flex items-center gap-2">
-                        {animatedOnlineAgents} <span className="text-slate-400 text-sm font-normal">/ {clientAgents.length}</span>
+                        <AnimatedNumber value={onlineAgents} />
+                        <span className="text-slate-400 text-sm font-normal">/ {clientAgents.length}</span>
                     </div>
                 </div>
                 <div className="client-card__metric">
                     <span className="client-card__metric-label">API Calls Today</span>
                     <div className="client-card__metric-value text-emerald-600">
-                        {formatCompactNumber(animatedTotalTodayCalls)}
+                        <AnimatedNumber value={totalTodayCalls} formatter={formatCompactNumber} />
                     </div>
                 </div>
             </div>

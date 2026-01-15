@@ -1,17 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, ShieldCheck, Power, CheckCircle2 } from 'lucide-react';
-import { Toggle } from '../../../components/common';
+import { Toggle, AnimatedNumber } from '../../../components/common';
 import { formatNumber, formatRelativeTime } from '../../../utils/formatters';
-import { useCountUp } from '../../../utils/useCountUp';
 
 export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
     const [resultMessage, setResultMessage] = useState(null);
     const [isError, setIsError] = useState(false);
-    
-    // 숫자 카운트업 애니메이션 (1씩 천천히 증가)
-    const animatedTodayTasks = useCountUp(agent.todayTasks || 0, 1000, 0, 50);
-    const animatedTodayApiCalls = useCountUp(agent.todayApiCalls || 0, 1000, 0, 50);
     
     const handleCheck = async () => {
         if (!agent.isLiveAgent || isChecking) return;
@@ -82,11 +77,15 @@ export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }
             {/* Stats Section */}
             <div className="agent-card__stats">
                 <div className="agent-card__stat">
-                    <div className="agent-card__stat-value">{formatNumber(animatedTodayTasks)}</div>
+                    <div className="agent-card__stat-value">
+                        <AnimatedNumber value={agent.todayTasks || 0} formatter={formatNumber} />
+                    </div>
                     <div className="agent-card__stat-label">오늘 작업</div>
                 </div>
                 <div className="agent-card__stat">
-                    <div className="agent-card__stat-value">{formatNumber(animatedTodayApiCalls)}</div>
+                    <div className="agent-card__stat-value">
+                        <AnimatedNumber value={agent.todayApiCalls || 0} formatter={formatNumber} />
+                    </div>
                     <div className="agent-card__stat-label">오늘 API 호출</div>
                 </div>
                 <div className="agent-card__stat">
