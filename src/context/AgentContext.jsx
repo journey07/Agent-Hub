@@ -216,6 +216,9 @@ export function AgentProvider({ children }) {
                     .from('hourly_stats')
                     .select('agent_id, hour, tasks, api_calls');
 
+                // 로그도 함께 가져오기 (Realtime 실패 시 대비)
+                const logsResult = await getRecentActivityLogs(100);
+
                 // 에이전트별로 데이터 매핑
                 const agentsWithStats = (agents || []).map(agent => {
                     const agentDailyStats = (allDailyStats || []).filter(s => s.agent_id === agent.id);
@@ -247,13 +250,13 @@ export function AgentProvider({ children }) {
                     };
                 });
 
-                return agentsWithStats;
+                return { agents: agentsWithStats, logs: logsResult.data || [] };
             },
             '경량 통계 새로고침'
         );
 
-        if (result.success && result.data && result.data.length > 0) {
-            const sortedAgents = [...result.data].sort((a, b) => {
+        if (result.success && result.data) {
+            const sortedAgents = [...result.data.agents].sort((a, b) => {
                 if (a.id === 'agent-worldlocker-001') return -1;
                 if (b.id === 'agent-worldlocker-001') return 1;
                 return 0;
@@ -263,18 +266,33 @@ export function AgentProvider({ children }) {
             setStats(calculateStats(sortedAgents));
             setWeeklyApiUsage(calculateWeeklyApiUsage(sortedAgents));
             setHourlyTraffic(calculateHourlyTraffic(sortedAgents));
+            
+            // 로그도 업데이트 (Realtime 실패 시 대비)
+            if (result.data.logs && result.data.logs.length > 0) {
+                setActivityLogs(result.data.logs);
+            }
+            
             setIsConnected(true);
         }
     }, []);
 
-    // Fallback polling: Realtime이 실패할 경우를 대비한 백업 (30초마다)
+    // Fallback polling: Realtime이 실패할 경우를 대비한 백업 (연결이 끊어졌을 때만)
     useEffect(() => {
+        // Realtime이 연결되어 있으면 polling 불필요
+        if (isConnected) {
+            return;
+        }
+
+        // Realtime이 끊어졌을 때만 fallback으로 주기적 업데이트
         const fallbackIntervalId = setInterval(() => {
+            console.warn('⚠️⚠️⚠️ Realtime disconnected, using fallback polling...');
+            console.warn('⏱️ Fallback polling은 30초마다 실행되므로 최대 30초 지연이 발생할 수 있습니다!');
+            console.warn('🔍 Realtime 연결 상태를 확인하세요. 브라우저 콘솔에서 "✅✅✅ WebSocket Connected" 메시지를 찾으세요.');
             refreshStatsOnly();
         }, 30000); // 30초마다 백업 업데이트
 
         return () => clearInterval(fallbackIntervalId);
-    }, [refreshStatsOnly]);
+    }, [isConnected, refreshStatsOnly]);
 
     // Refresh data function (full refresh - used for initial load and fallback)
     const refreshData = useCallback(async () => {
@@ -390,6 +408,12 @@ export function AgentProvider({ children }) {
     // Batch update queue for debouncing multiple rapid updates
     const updateQueueRef = useRef(new Set());
     const updateTimerRef = useRef(null);
+    const updateSingleAgentRef = useRef(updateSingleAgent);
+
+    // Keep ref updated
+    useEffect(() => {
+        updateSingleAgentRef.current = updateSingleAgent;
+    }, [updateSingleAgent]);
 
     const queueAgentUpdate = useCallback((agentId) => {
         updateQueueRef.current.add(agentId);
@@ -404,10 +428,10 @@ export function AgentProvider({ children }) {
             const agentIds = Array.from(updateQueueRef.current);
             updateQueueRef.current.clear();
 
-            // Process all queued updates
-            await Promise.all(agentIds.map(id => updateSingleAgent(id)));
+            // Process all queued updates using ref to avoid closure issues
+            await Promise.all(agentIds.map(id => updateSingleAgentRef.current(id)));
         }, 300);
-    }, [updateSingleAgent]);
+    }, []);
 
     // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
     useEffect(() => {
@@ -480,8 +504,17 @@ export function AgentProvider({ children }) {
                 table: 'activity_logs'
             },
             (payload) => {
+                const receivedTime = Date.now();
+                const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
+                const delay = receivedTime - logTimestamp;
+                
                 console.log('⚡⚡⚡ 실시간 로그 이벤트 수신!', payload);
+                console.log(`⏱️ 지연 시간: ${delay}ms (${(delay / 1000).toFixed(2)}초)`);
                 console.log('Payload 전체:', JSON.stringify(payload, null, 2));
+                
+                if (delay > 2000) {
+                    console.error(`❌ 심각한 지연 감지: ${delay}ms - Realtime이 제대로 작동하지 않을 수 있습니다!`);
+                }
                 
                 if (payload.new) {
                     const newLog = payload.new;
@@ -614,15 +647,25 @@ export function AgentProvider({ children }) {
                 if (status === 'SUBSCRIBED') {
                     console.log('✅✅✅ WebSocket Connected - 실시간 업데이트 활성화!');
                     console.log('📡 Subscribed to: agents, activity_logs, daily_stats, hourly_stats, api_breakdown');
+                    console.log('🔍 Realtime 연결 상태: SUBSCRIBED - 이제 실시간 업데이트가 작동합니다!');
                     setIsConnected(true);
                 } else if (status === 'CLOSED') {
-                    console.log('❌ WebSocket Disconnected');
+                    console.error('❌ WebSocket Disconnected - Realtime이 끊어졌습니다!');
+                    console.error('⚠️ 이제 fallback polling (30초마다)만 작동합니다.');
                     setIsConnected(false);
                 } else if (status === 'CHANNEL_ERROR') {
                     console.error('⚠️ WebSocket Channel Error:', err);
+                    console.error('❌ Realtime 구독 실패 - fallback polling으로 전환됩니다.');
+                    setIsConnected(false);
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⏱️ WebSocket Connection Timeout - Realtime 연결 시간 초과!');
                     setIsConnected(false);
                 } else {
                     console.log('📡 WebSocket Status:', status, err);
+                    if (status !== 'SUBSCRIBED') {
+                        console.warn(`⚠️ Realtime 상태가 SUBSCRIBED가 아닙니다: ${status}`);
+                        setIsConnected(false);
+                    }
                 }
             });
 
@@ -634,7 +677,7 @@ export function AgentProvider({ children }) {
             }
             supabase.removeChannel(channel);
         };
-    }, [refreshData, updateSingleAgent, updateActivityLogs, queueAgentUpdate]);
+    }, []); // Empty dependency array to prevent subscription recreation
 
     // Toggle agent status (on/off)
     const toggleAgent = useCallback(async (agentId) => {
