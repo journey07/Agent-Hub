@@ -131,6 +131,15 @@ Supabase Realtime은 PostgreSQL의 **WAL (Write-Ahead Log)**을 사용합니다:
   - Supabase DB에 데이터 저장
   - **Realtime과 직접 연결 없음** (브라우저가 직접 연결)
 
+#### **Vercel WebSocket 지원 여부**
+- ❌ **Vercel은 WebSocket 서버를 지원하지 않습니다**
+  - Serverless Functions는 stateless이고 짧은 실행 시간만 지원
+  - WebSocket은 장기 연결이 필요한데, Vercel의 서버리스 모델과 맞지 않음
+- ✅ **하지만 문제 없습니다!**
+  - Supabase Realtime은 **브라우저에서 직접 Supabase Realtime 서버에 WebSocket 연결**
+  - Vercel을 거치지 않으므로 Vercel의 WebSocket 지원 여부는 중요하지 않음
+  - 브라우저 → Supabase Realtime (직접 WebSocket 연결)
+
 #### **Render (에이전트 백엔드)**
 - **역할**: 
   - 실제 비즈니스 로직 실행 (견적 생성, 이미지 생성 등)

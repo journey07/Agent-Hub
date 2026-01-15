@@ -276,18 +276,18 @@ export function AgentProvider({ children }) {
         }
     }, []);
 
-    // Fallback polling: Realtime이 실패할 경우를 대비한 백업 (연결이 끊어졌을 때만)
+    // Fallback polling: Realtime이 완전히 실패할 경우를 대비한 백업 (연결이 끊어졌을 때만)
     useEffect(() => {
-        // Realtime이 연결되어 있으면 polling 불필요
+        // Realtime이 연결되어 있으면 polling 불필요 - WebSocket으로 실시간 업데이트
         if (isConnected) {
+            console.log('✅ Realtime 연결됨 - WebSocket으로 실시간 업데이트 중');
             return;
         }
 
-        // Realtime이 끊어졌을 때만 fallback으로 주기적 업데이트
+        // Realtime이 끊어졌을 때만 fallback으로 주기적 업데이트 (30초마다)
+        console.warn('⚠️ Realtime 연결 끊어짐 - Fallback polling 활성화 (30초마다)');
         const fallbackIntervalId = setInterval(() => {
-            console.warn('⚠️⚠️⚠️ Realtime disconnected, using fallback polling...');
-            console.warn('⏱️ Fallback polling은 30초마다 실행되므로 최대 30초 지연이 발생할 수 있습니다!');
-            console.warn('🔍 Realtime 연결 상태를 확인하세요. 브라우저 콘솔에서 "✅✅✅ WebSocket Connected" 메시지를 찾으세요.');
+            console.warn('⚠️ Fallback polling 실행 중... (Realtime 연결 복구 대기)');
             refreshStatsOnly();
         }, 30000); // 30초마다 백업 업데이트
 
@@ -436,6 +436,32 @@ export function AgentProvider({ children }) {
     // WebSocket 기반 완전 실시간 업데이트 (홈쇼핑처럼!)
     useEffect(() => {
         console.log('📡 Setting up WebSocket Realtime for instant updates...');
+        console.log('🔍 Realtime 구독 설정 시작...');
+        
+        // 전역 변수로 테스트 함수 노출 (브라우저 콘솔에서 사용)
+        if (typeof window !== 'undefined') {
+            window.testRealtimeInsert = async () => {
+                console.log('🧪 Realtime INSERT 테스트 시작...');
+                const { data, error } = await supabase
+                    .from('activity_logs')
+                    .insert({
+                        agent_id: 'agent-worldlocker-001',
+                        action: '🧪 테스트 로그 - Realtime 작동 확인',
+                        type: 'test',
+                        status: 'info',
+                        timestamp: new Date().toISOString(),
+                        response_time: 0
+                    });
+                
+                if (error) {
+                    console.error('❌ INSERT 실패:', error);
+                } else {
+                    console.log('✅ INSERT 성공:', data);
+                    console.log('⏳ 이제 "⚡⚡⚡ 실시간 로그 이벤트 수신!" 메시지가 나타나야 합니다...');
+                }
+            };
+            console.log('💡 테스트: 브라우저 콘솔에서 testRealtimeInsert() 실행하세요');
+        }
 
         // Use a single channel for all dashboard updates to avoid connection limits/race conditions
         const channel = supabase
@@ -502,13 +528,16 @@ export function AgentProvider({ children }) {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'activity_logs'
+                // filter 제거 - 모든 INSERT 이벤트 구독
             },
             (payload) => {
                 const receivedTime = Date.now();
                 const logTimestamp = payload.new?.timestamp ? new Date(payload.new.timestamp).getTime() : receivedTime;
                 const delay = receivedTime - logTimestamp;
                 
-                console.log('⚡⚡⚡ 실시간 로그 이벤트 수신!', payload);
+                console.log('⚡⚡⚡⚡⚡ 실시간 로그 이벤트 수신! ⚡⚡⚡⚡⚡');
+                console.log('📦 Payload:', payload);
+                console.log('📦 payload.new:', payload.new);
                 console.log(`⏱️ 지연 시간: ${delay}ms (${(delay / 1000).toFixed(2)}초)`);
                 console.log('Payload 전체:', JSON.stringify(payload, null, 2));
                 
@@ -644,10 +673,17 @@ export function AgentProvider({ children }) {
                 }
             )
             .subscribe((status, err) => {
+                console.log(`🔍 Realtime 구독 상태 변경: ${status}`, err || '');
+                
                 if (status === 'SUBSCRIBED') {
                     console.log('✅✅✅ WebSocket Connected - 실시간 업데이트 활성화!');
                     console.log('📡 Subscribed to: agents, activity_logs, daily_stats, hourly_stats, api_breakdown');
                     console.log('🔍 Realtime 연결 상태: SUBSCRIBED - 이제 실시간 업데이트가 작동합니다!');
+                    console.log('');
+                    console.log('🧪 테스트: Supabase Dashboard → Table Editor → activity_logs에서 수동으로 INSERT 해보세요');
+                    console.log('   또는 브라우저 콘솔에서 다음 코드 실행:');
+                    console.log('   await supabase.from("activity_logs").insert({agent_id: "agent-worldlocker-001", action: "테스트", type: "test", status: "info", timestamp: new Date().toISOString(), response_time: 0})');
+                    console.log('');
                     setIsConnected(true);
                 } else if (status === 'CLOSED') {
                     console.error('❌ WebSocket Disconnected - Realtime이 끊어졌습니다!');
