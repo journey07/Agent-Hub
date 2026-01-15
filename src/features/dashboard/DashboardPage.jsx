@@ -11,7 +11,8 @@ import {
     ActivityIconClean,
     AlertCircleIconClean,
     CheckCircleIconClean,
-    ClockIconClean
+    ClockIconClean,
+    InfoIconClean
 } from '../../components/common/CustomIcons';
 
 export function DashboardPage() {
@@ -104,6 +105,9 @@ export function DashboardPage() {
                                     {log.type === 'error' && <AlertCircleIconClean size={20} />}
                                     {log.type === 'warning' && <AlertCircleIconClean size={20} color="#F59E0B" />}
                                     {log.type === 'processing' && <ClockIconClean size={20} />}
+                                    {log.type === 'info' && <InfoIconClean size={20} />}
+                                    {log.type === 'log' && <InfoIconClean size={20} />}
+                                    {log.type === 'heartbeat' && <InfoIconClean size={20} color="#10B981" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-semibold text-slate-900">{log.agent}</div>

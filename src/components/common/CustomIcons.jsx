@@ -120,3 +120,11 @@ export const ClockIconClean = ({ size = 24, className, color = '#6366F1' }) => (
         <path d="M12 7V12L15 15" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
+
+export const InfoIconClean = ({ size = 24, className, color = '#3B82F6' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" />
+        <path d="M12 16V12" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="12" cy="8" r="1" fill={color} />
+    </svg>
+);

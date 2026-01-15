@@ -88,10 +88,12 @@ export default async function handler(req, res) {
 
         // 1. Handle Heartbeat (Registration)
         if (apiType === 'heartbeat') {
+            const nowIso = new Date().toISOString();
+
             const { error: hbError } = await supabase
                 .from('agents')
                 .update({
-                    last_active: new Date().toISOString(),
+                    last_active: nowIso,
                     model: model,
                     base_url: baseUrl, // Important for toggle
                     status: 'online'
@@ -102,6 +104,40 @@ export default async function handler(req, res) {
                 console.error(`❌ Heartbeat Error [${agentId}]:`, hbError.message);
                 return res.status(500).json({ success: false, error: hbError.message });
             }
+
+            // Fetch agent info to include project/client name in the log
+            const { data: agentInfo, error: agentError } = await supabase
+                .from('agents')
+                .select('name, client_name, client_id')
+                .eq('id', agentId)
+                .single();
+
+            if (agentError) {
+                console.error(`⚠️ Failed to fetch agent info for heartbeat log [${agentId}]:`, agentError.message);
+            } else {
+                const projectLabel =
+                    agentInfo.client_name ||
+                    agentInfo.client_id ||
+                    agentInfo.name ||
+                    agentId;
+
+                // Write heartbeat into activity_logs so it appears in Recent Activity
+                const { error: logError } = await supabase
+                    .from('activity_logs')
+                    .insert({
+                        agent_id: agentId,
+                        action: `Heartbeat - ${projectLabel}`,
+                        type: 'heartbeat',
+                        status: 'success',
+                        timestamp: nowIso,
+                        response_time: responseTime || 0
+                    });
+
+                if (logError) {
+                    console.error(`⚠️ Failed to log heartbeat activity [${agentId}]:`, logError.message);
+                }
+            }
+
             console.log(`💓 Heartbeat: ${agentId}`);
             return res.json({ success: true });
         }

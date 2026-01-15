@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
-import { formatNumber, formatRelativeTime } from '../../utils/formatters';
+import { formatNumber, formatRelativeTime, formatLogTimestamp } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo } from 'react';
 import './AgentDetailPage.css';
@@ -393,10 +393,78 @@ export function AgentDetailPage() {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} interval={chartTimeRange === 'today' ? 3 : 0} />
+                                    <XAxis 
+                                        dataKey="name" 
+                                        stroke="#64748b" 
+                                        fontSize={11} 
+                                        tickLine={false} 
+                                        axisLine={false} 
+                                        interval={0}
+                                        tickFormatter={(value) => {
+                                            if (!value) return '';
+                                            const currentHour = new Date().getHours();
+                                            const hour = parseInt(value.split(':')[0]);
+                                            
+                                            // 현재 시간 기준으로 최근 3시간은 모두 표시
+                                            // 예: 현재가 20시면 18, 19, 20 모두 표시
+                                            if (hour >= currentHour - 2 && hour <= currentHour) {
+                                                return value;
+                                            }
+                                            // 그 외는 3시간마다 표시 (0, 3, 6, 9, 12, 15, 18, 21)
+                                            if (hour % 3 === 0) {
+                                                return value;
+                                            }
+                                            return '';
+                                        }}
+                                    />
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                        content={({ active, payload, label }) => {
+                                            if (active && payload && payload.length) {
+                                                return (
+                                                    <div style={{
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                                        borderRadius: '12px',
+                                                        border: '1px solid #e2e8f0',
+                                                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                                        padding: '12px 16px'
+                                                    }}>
+                                                        <div style={{
+                                                            fontSize: '14px',
+                                                            fontWeight: '700',
+                                                            color: '#1e293b',
+                                                            marginBottom: '8px',
+                                                            borderBottom: '1px solid #e2e8f0',
+                                                            paddingBottom: '6px'
+                                                        }}>
+                                                            {label}
+                                                        </div>
+                                                        {payload.map((entry, index) => (
+                                                            <div key={index} style={{
+                                                                fontSize: '13px',
+                                                                fontWeight: '600',
+                                                                color: entry.color,
+                                                                marginTop: '4px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px'
+                                                            }}>
+                                                                <span style={{
+                                                                    display: 'inline-block',
+                                                                    width: '8px',
+                                                                    height: '8px',
+                                                                    borderRadius: '50%',
+                                                                    backgroundColor: entry.color
+                                                                }}></span>
+                                                                <span>{entry.name}:</span>
+                                                                <span style={{ fontWeight: '700' }}>{entry.value.toLocaleString()}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
                                     />
                                     <Area isAnimationActive={false} type="monotone" dataKey="Tasks" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTasks)" />
                                     <Area isAnimationActive={false} type="monotone" dataKey="API Calls" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorApi)" />
@@ -474,7 +542,7 @@ export function AgentDetailPage() {
                                 agentLogs.slice(0, 5).map((log, idx) => (
                                     <div key={log.id || idx} className="recent-log-item">
                                         <span className="log-ts">
-                                            [{new Date(log.timestamp).toLocaleTimeString([], { hour12: false })}]
+                                            [{formatLogTimestamp(log.timestamp)}]
                                         </span>
                                         <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
                                             {log.type ? log.type.toUpperCase() : 'INFO'}
@@ -541,7 +609,7 @@ export function AgentDetailPage() {
                                     {agentLogs.map((log, idx) => (
                                         <div key={log.id || idx} className="log-entry">
                                             <span className="log-ts">
-                                                [{new Date(log.timestamp).toLocaleTimeString([], { hour12: false })}]
+                                                [{formatLogTimestamp(log.timestamp)}]
                                             </span>
                                             <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
                                                 {log.type ? log.type.toUpperCase() : 'INFO'}
