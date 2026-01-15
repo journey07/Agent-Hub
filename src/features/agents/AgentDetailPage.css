@@ -506,6 +506,7 @@
 /* Recent Logs Mini Section in Overview */
 .grid-item-logs {
     grid-column: 1;
+    overflow: hidden;
 }
 
 .grid-item-system {
@@ -518,6 +519,7 @@
     gap: 8px;
     max-height: 200px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .recent-log-item {
@@ -530,6 +532,8 @@
     line-height: 1.5;
     transition: background 0.1s;
     align-items: center;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .recent-log-item:hover {
@@ -560,6 +564,7 @@
 .recent-log-item .log-msg {
     color: var(--color-text-primary);
     flex: 1;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
