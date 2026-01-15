@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { ErrorBanner } from '../common';
 import { useAgents } from '../../context/AgentContext';
 
 const pageTitles = {
@@ -32,7 +33,7 @@ export function MainLayout() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const location = useLocation();
-    const { agents, clients } = useAgents();
+    const { agents, clients, error, clearError } = useAgents();
 
     const title = location.pathname.startsWith('/agents/') ? '에이전트 디테일' : (pageTitles[location.pathname] || "Supersquad's Hub");
     const isAgentsPage = location.pathname === '/agents';
@@ -88,6 +89,14 @@ export function MainLayout() {
                 </div>
 
                 <div className="app-layout__content">
+                    {error && (
+                        <ErrorBanner 
+                            error={error} 
+                            onDismiss={clearError}
+                            autoDismiss={true}
+                            dismissAfter={8000}
+                        />
+                    )}
                     <Outlet context={{ searchTerm, statusFilter }} />
                 </div>
             </main>

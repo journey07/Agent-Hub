@@ -1,35 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { initSupabase } from './lib/supabase.js';
 
-// Initialize Supabase Client for Brain Server
-// Use Service Role Key if available, otherwise use Anon Key + login
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// Initialize Supabase client (will be initialized on first request)
+let supabase;
+let initializationPromise = null;
 
-// Prefer Service Role Key (bypasses RLS), fallback to Anon Key
-const supabaseKey = supabaseServiceKey || supabaseAnonKey;
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-        persistSession: false // Server-side, no local storage
+async function getSupabaseClient() {
+    if (supabase) {
+        return supabase;
     }
-});
 
-// Login as system admin if using Anon Key (needed for RLS authenticated policy)
-async function ensureAuthenticated() {
-    if (supabaseServiceKey) {
-        // Service Role Key bypasses RLS, no login needed
-        return;
+    if (!initializationPromise) {
+        initializationPromise = initSupabase().then(({ supabase: client }) => {
+            supabase = client;
+            return client;
+        }).catch((error) => {
+            initializationPromise = null; // Reset on error to allow retry
+            throw error;
+        });
     }
-    
-    // Using Anon Key, need to login for authenticated access
-    const { error } = await supabase.auth.signInWithPassword({
-        email: 'steve@dashboard.local',
-        password: 'password123'
-    });
-    if (error) {
-        console.error('⚠️ System login failed (may still work if RLS allows):', error.message);
-    }
+
+    return initializationPromise;
 }
 
 // CORS headers helper
@@ -62,8 +52,8 @@ export default async function handler(req, res) {
     setCorsHeaders(res);
 
     try {
-        // Ensure we have authenticated access (if using Anon Key)
-        await ensureAuthenticated();
+        // Get authenticated Supabase client
+        const supabase = await getSupabaseClient();
 
         const {
             agentId,
@@ -105,7 +95,7 @@ export default async function handler(req, res) {
                 return res.status(500).json({ success: false, error: hbError.message });
             }
 
-            // Fetch agent info to include project/client name in the log
+            // Fetch agent info to include agent name in the log
             const { data: agentInfo, error: agentError } = await supabase
                 .from('agents')
                 .select('name, client_name, client_id')
@@ -114,19 +104,30 @@ export default async function handler(req, res) {
 
             if (agentError) {
                 console.error(`⚠️ Failed to fetch agent info for heartbeat log [${agentId}]:`, agentError.message);
+                // 에이전트 정보를 가져오지 못해도 기본값으로 로그 생성
+                const { error: logError } = await supabase
+                    .from('activity_logs')
+                    .insert({
+                        agent_id: agentId,
+                        action: `Heartbeat - ${agentId}`,
+                        type: 'heartbeat',
+                        status: 'success',
+                        timestamp: nowIso,
+                        response_time: responseTime || 0
+                    });
+                if (logError) {
+                    console.error(`⚠️ Failed to log heartbeat activity [${agentId}]:`, logError.message);
+                }
             } else {
-                const projectLabel =
-                    agentInfo.client_name ||
-                    agentInfo.client_id ||
-                    agentInfo.name ||
-                    agentId;
+                // 에이전트 이름 우선 사용, 없으면 client_name, 없으면 agentId
+                const agentName = agentInfo.name || agentInfo.client_name || agentId;
 
                 // Write heartbeat into activity_logs so it appears in Recent Activity
                 const { error: logError } = await supabase
                     .from('activity_logs')
                     .insert({
                         agent_id: agentId,
-                        action: `Heartbeat - ${projectLabel}`,
+                        action: `Heartbeat - ${agentName}`,
                         type: 'heartbeat',
                         status: 'success',
                         timestamp: nowIso,

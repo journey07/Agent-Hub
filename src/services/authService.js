@@ -41,11 +41,15 @@ export async function login(username, password) {
 export async function logout() {
     try {
         const { error } = await supabase.auth.signOut();
-        if (error) throw error;
+        // 세션이 없어도 로그아웃은 성공으로 처리 (이미 로그아웃된 상태)
+        if (error && !error.message.includes('session missing')) {
+            throw error;
+        }
         return { success: true };
     } catch (error) {
         console.error('Logout failed:', error);
-        return { success: false, error: error.message };
+        // 에러가 있어도 로그인 페이지로 보내기 위해 성공으로 처리
+        return { success: true };
     }
 }
 

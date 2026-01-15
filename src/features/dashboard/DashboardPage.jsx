@@ -2,13 +2,9 @@ import { useAgents } from '../../context/AgentContext';
 import { ApiUsageChart } from '../../components/charts';
 import { StatusBadge } from '../../components/common';
 import { StatCard } from './StatCard';
-import { apiUsageData, hourlyData } from '../../data/mockData';
 import { formatRelativeTime, formatNumber } from '../../utils/formatters';
 import {
     BotIcon,
-    UsersIconClean,
-    ZapIconClean,
-    ActivityIconClean,
     AlertCircleIconClean,
     CheckCircleIconClean,
     ClockIconClean,
@@ -16,7 +12,7 @@ import {
 } from '../../components/common/CustomIcons';
 
 export function DashboardPage() {
-    const { agents, stats, activityLogs } = useAgents();
+    const { agents, stats, activityLogs, weeklyApiUsage, hourlyTraffic } = useAgents();
 
     const errorAgentsList = agents.filter(a => a.status === 'error' || a.apiStatus === 'error');
 
@@ -25,47 +21,24 @@ export function DashboardPage() {
             {/* Stats Grid */}
             <div className="grid grid--4 mb-xl gap-xl">
                 <StatCard
-                    icon={BotIcon}
                     label="Active Agents"
                     value={`${stats.activeAgents} / ${stats.totalAgents}`}
                     iconColor="primary"
-                    className="card--glow"
                 />
                 <StatCard
-                    icon={ZapIconClean}
-                    label="API Calls Today"
-                    value={stats.todayApiCalls}
-                    change={8}
-                    changeType="positive"
+                    label="Today Tasks"
+                    value={stats.todayTasks || 0}
                     iconColor="info"
-                    className="card--glow"
                 />
                 <StatCard
-                    icon={ClockIconClean}
+                    label="Today API Calls"
+                    value={stats.todayApiCalls}
+                    iconColor="danger"
+                />
+                <StatCard
                     label="Avg Response"
                     value={`${stats.avgResponseTime || 0}ms`}
-                    changeType="positive"
-                    iconColor="success"
-                    className="card--glow"
-                />
-                <StatCard
-                    icon={AlertCircleIconClean}
-                    label="Issues Detected"
-                    value={stats.errorAgents}
-                    iconColor={stats.errorAgents > 0 ? "error" : "success"}
-                    className={`card--glow ${stats.errorAgents > 0 ? "border-red-100 bg-red-50/10" : ""}`}
-                    tooltip={
-                        stats.errorAgents > 0 ? (
-                            <ul className="list-disc pl-4 space-y-1">
-                                {errorAgentsList.map(agent => (
-                                    <li key={agent.id}>
-                                        <span className="font-semibold">{agent.name}:</span>
-                                        <span className="opacity-80 ml-1">Error detected</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : "All systems normal"
-                    }
+                    iconColor="orange"
                 />
             </div>
 
@@ -76,14 +49,14 @@ export function DashboardPage() {
                         <h3 className="card__title">Weekly API Usage</h3>
                         {/* Period selector could go here */}
                     </div>
-                    <ApiUsageChart data={apiUsageData} type="area" />
+                    <ApiUsageChart data={weeklyApiUsage} type="area" />
                 </section>
 
                 <section className="card">
                     <div className="card__header mb-lg">
                         <h3 className="card__title">Hourly Traffic</h3>
                     </div>
-                    <ApiUsageChart data={hourlyData} type="bar" />
+                    <ApiUsageChart data={hourlyTraffic} type="bar" />
                 </section>
             </div>
 
@@ -134,7 +107,7 @@ export function DashboardPage() {
                             >
                                 <div className="flex items-center gap-md flex-1 min-w-0">
                                     <div className="stat-card__icon stat-card__icon--clean flex-shrink-0">
-                                        <BotIcon size={22} />
+                                        <BotIcon size={20} />
                                     </div>
                                     <div className="min-w-0">
                                         <div className="text-sm font-semibold text-slate-900 truncate">{agent.name}</div>

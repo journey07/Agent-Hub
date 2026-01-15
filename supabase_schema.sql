@@ -219,7 +219,8 @@ DECLARE
     v_today DATE;
     v_current_hour TEXT;
 BEGIN
-    v_today := CURRENT_DATE;
+    -- Use Korean timezone for all date calculations
+    v_today := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE;
     v_current_hour := TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul', 'HH24');
 
     -- Update agent counters
@@ -257,6 +258,19 @@ BEGIN
         tasks = hourly_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         api_calls = hourly_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
         updated_at = v_today;
+
+    -- Update daily stats (using Korean timezone date)
+    INSERT INTO daily_stats (agent_id, date, tasks, api_calls)
+    VALUES (
+        p_agent_id,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::DATE,
+        CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
+        CASE WHEN p_should_count_api THEN 1 ELSE 0 END
+    )
+    ON CONFLICT (agent_id, date) DO UPDATE
+    SET 
+        tasks = daily_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
+        api_calls = daily_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END;
 END;
 $$;
 

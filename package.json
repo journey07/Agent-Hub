@@ -8,7 +8,8 @@
     "brain": "node --watch server.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "change-password": "node change-password.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

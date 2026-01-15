@@ -1,28 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { initSupabase } from '../lib/supabase.js';
 
-// Initialize Supabase Client
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabaseKey = supabaseServiceKey || supabaseAnonKey;
+// Initialize Supabase client (will be initialized on first request)
+let supabase;
+let initializationPromise = null;
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-        persistSession: false
+async function getSupabaseClient() {
+    if (supabase) {
+        return supabase;
     }
-});
 
-// Login as system admin if using Anon Key
-async function ensureAuthenticated() {
-    if (supabaseServiceKey) return;
-    
-    const { error } = await supabase.auth.signInWithPassword({
-        email: 'steve@dashboard.local',
-        password: 'password123'
-    });
-    if (error) {
-        console.error('⚠️ System login failed:', error.message);
+    if (!initializationPromise) {
+        initializationPromise = initSupabase().then(({ supabase: client }) => {
+            supabase = client;
+            return client;
+        }).catch((error) => {
+            initializationPromise = null; // Reset on error to allow retry
+            throw error;
+        });
     }
+
+    return initializationPromise;
 }
 
 // CORS headers helper
@@ -59,7 +56,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        await ensureAuthenticated();
+        // Get authenticated Supabase client
+        const supabase = await getSupabaseClient();
 
         console.log(`🔘 Manual Check Triggered for ${agentId}`);
 
@@ -70,9 +68,32 @@ export default async function handler(req, res) {
             .eq('id', agentId)
             .single();
 
-        if (error || !agent) {
-            return res.status(404).json({ error: 'Agent not found' });
+        if (error) {
+            console.error(`❌ Supabase query error for ${agentId}:`, error);
+            // PGRST116 means no rows returned (not found)
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ 
+                    error: 'Agent not found',
+                    details: `No agent found with id: ${agentId}`,
+                    code: error.code
+                });
+            }
+            return res.status(500).json({ 
+                error: 'Database query failed',
+                details: error.message,
+                code: error.code
+            });
         }
+
+        if (!agent) {
+            console.error(`❌ Agent ${agentId} query returned null`);
+            return res.status(404).json({ 
+                error: 'Agent not found',
+                details: `Query returned null for id: ${agentId}`
+            });
+        }
+
+        console.log(`✅ Found agent: ${agentId}, base_url: ${agent.base_url || 'null'}`);
 
         let newStatus = 'online';
         let newApiStatus = 'healthy';
@@ -84,45 +105,96 @@ export default async function handler(req, res) {
 
         // Check agent health endpoints
         try {
-            const healthRes = await fetch(`${agent.base_url}/api/quote/health`, { 
+            const healthUrl = `${agent.base_url}/api/quote/health`;
+            console.log(`🔍 Checking health at: ${healthUrl}`);
+            
+            const healthRes = await fetch(healthUrl, { 
                 signal: AbortSignal.timeout(5000) 
             });
             
             if (!healthRes.ok) {
+                const errorText = await healthRes.text().catch(() => 'Unknown error');
+                console.error(`❌ Health check failed: ${healthRes.status} ${healthRes.statusText} - ${errorText}`);
                 newStatus = 'offline';
                 newApiStatus = 'error';
             } else {
+                console.log(`✅ Health check passed for ${agentId}`);
+                
                 // Verify API endpoint
-                const verifyRes = await fetch(`${agent.base_url}/api/quote/verify-api`, { 
+                const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
+                console.log(`🔍 Verifying API at: ${verifyUrl}`);
+                
+                const verifyRes = await fetch(verifyUrl, { 
                     method: 'POST', 
                     signal: AbortSignal.timeout(5000) 
                 });
                 
                 if (!verifyRes.ok) {
+                    const errorText = await verifyRes.text().catch(() => 'Unknown error');
+                    console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
                     newApiStatus = 'error';
                 } else {
                     const verifyData = await verifyRes.json();
                     newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    console.log(`✅ API verify result: ${newApiStatus}`);
                 }
             }
         } catch (err) {
-            console.error(`❌ Health check failed for ${agentId}:`, err.message);
+            console.error(`❌ Health check exception for ${agentId}:`, err.message);
+            console.error(`   Error type: ${err.name}, Cause: ${err.cause?.message || 'N/A'}`);
             newStatus = 'offline';
             newApiStatus = 'error';
         }
 
-        // Update Supabase
+        // Update Supabase with status
+        const nowIso = new Date().toISOString();
         const { error: updateError } = await supabase
             .from('agents')
             .update({
                 status: newStatus,
                 api_status: newApiStatus,
-                last_active: new Date().toISOString()
+                last_active: nowIso
             })
             .eq('id', agentId);
 
         if (updateError) {
             console.error(`❌ Failed to update agent status:`, updateError.message);
+        }
+
+        // Send heartbeat via /api/stats endpoint (same as agent's heartbeat)
+        // This ensures proper activity logging and updates
+        if (newApiStatus === 'healthy' && agent.base_url) {
+            try {
+                // Call the stats endpoint internally to send heartbeat
+                const statsApiUrl = process.env.VERCEL_URL 
+                    ? `https://${process.env.VERCEL_URL}/api/stats`
+                    : 'http://localhost:5001/api/stats';
+                
+                const heartbeatResponse = await fetch(statsApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId: agentId,
+                        apiType: 'heartbeat',
+                        baseUrl: agent.base_url,
+                        model: agent.model || 'gemini-3-pro-image-preview',
+                        account: agent.account || 'admin@worldlocker.com',
+                        apiKey: agent.api_key || 'sk-unknown',
+                        shouldCountApi: false,
+                        shouldCountTask: false,
+                        responseTime: 0
+                    })
+                });
+
+                if (heartbeatResponse.ok) {
+                    console.log(`💓 Heartbeat sent via status check for ${agentId}`);
+                } else {
+                    const errorText = await heartbeatResponse.text().catch(() => 'Unknown error');
+                    console.error(`⚠️ Failed to send heartbeat: ${heartbeatResponse.status} - ${errorText}`);
+                }
+            } catch (hbError) {
+                console.error(`⚠️ Failed to send heartbeat:`, hbError.message);
+            }
         }
 
         res.json({ success: newApiStatus === 'healthy' });

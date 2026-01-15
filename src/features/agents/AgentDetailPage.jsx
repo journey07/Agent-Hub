@@ -16,47 +16,61 @@ export function AgentDetailPage() {
     const [chartTimeRange, setChartTimeRange] = useState('today'); // 'today' (others disabled for now)
     // Auto-scroll logic removed as logs are ordered newest-first (top)
 
-
-    // Filter logs for this agent
+    // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
+    // Filter logs for this agent (agent가 없어도 안전하게 처리)
     const agentLogs = useMemo(() => {
         if (!agent) return [];
         return activityLogs.filter(log => log.agent === agent.name || log.agentId === agent.id);
     }, [activityLogs, agent]);
 
-    if (!agent) {
-        return (
-            <div className="agent-detail-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-                <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    <AlertCircle size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>Agent Not Found</h2>
-                    <p style={{ marginBottom: '24px' }}>The agent you are looking for does not exist.</p>
-                    <Link to="/agents" className="btn btn--primary">
-                        Return to Agents
-                    </Link>
-                </div>
-            </div>
-        );
-    }
+    // 시간축 표시를 위한 ticks 계산 - 항상 0시부터 23시까지 모든 시간 표시
+    const xAxisTicks = useMemo(() => {
+        if (chartTimeRange === 'today') {
+            // 0시부터 23시까지 모든 시간을 명시적으로 지정
+            return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+        }
+        return null; // 'today'가 아닌 경우는 기본 동작 사용
+    }, [chartTimeRange]);
 
     const chartData = useMemo(() => {
+        if (!agent) return [];
+
         if (chartTimeRange === 'today') {
             // Hourly - Today
-            const stats = agent.hourlyStats || Array.from({ length: 24 }, (_, i) => ({
-                hour: i.toString().padStart(2, '0'),
-                tasks: 0,
-                apiCalls: 0
-            }));
+            // hourlyStats를 맵으로 변환하여 빠른 조회
+            const statsMap = new Map();
+            if (agent.hourlyStats && Array.isArray(agent.hourlyStats)) {
+                agent.hourlyStats.forEach(stat => {
+                    const hour = stat.hour || stat.hour_key || stat.h;
+                    if (hour !== undefined && hour !== null) {
+                        const hourStr = String(hour).padStart(2, '0');
+                        statsMap.set(hourStr, {
+                            tasks: stat.tasks || 0,
+                            apiCalls: stat.apiCalls || stat.calls || 0
+                        });
+                    }
+                });
+            }
+
+            // 항상 0시부터 23시까지 모든 시간 포함
+            const fullDayData = Array.from({ length: 24 }, (_, i) => {
+                const hourStr = i.toString().padStart(2, '0');
+                const stat = statsMap.get(hourStr) || { tasks: 0, apiCalls: 0 };
+                return {
+                    name: `${hourStr}:00`,
+                    Tasks: Number(stat.tasks || 0),
+                    'API Calls': Number(stat.apiCalls || 0)
+                };
+            });
 
             console.log('🔍 [DEBUG] hourlyStats:', agent.hourlyStats);
-            console.log('🔍 [DEBUG] Sample hourly stat:', stats[0]);
+            console.log('🔍 [DEBUG] fullDayData length:', fullDayData.length);
+            console.log('🔍 [DEBUG] Sample data points:', fullDayData.slice(0, 3), '...', fullDayData.slice(18, 21));
 
-            return stats.map(s => ({
-                name: `${s.hour}:00`,
-                Tasks: Number(s.tasks || 0),
-                'API Calls': Number(s.apiCalls || s.calls || 0)  // Try both field names
-            }));
+            return fullDayData;
         } else {
             // Daily - Week/Month (Show Daily History + Today)
+            if (!agent) return [];
             const history = agent.dailyHistory || [];
             console.log('🔍 [DEBUG] dailyHistory:', history);
 
@@ -90,13 +104,13 @@ export function AgentDetailPage() {
     };
 
     const apiData = useMemo(() => {
-        if (!agent.apiBreakdown) return [];
+        if (!agent || !agent.apiBreakdown) return [];
         return Object.entries(agent.apiBreakdown).map(([key, value]) => ({
             name: apiLabels[key] || key,
             calls: value.total,
             today: value.today
         })).sort((a, b) => b.calls - a.calls);
-    }, [agent.apiBreakdown]);
+    }, [agent]);
 
     const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -195,15 +209,23 @@ export function AgentDetailPage() {
     };
 
     const taskPerformanceData = useMemo(() => {
-        if (!agent.apiBreakdown) return [];
+        if (!agent || !agent.apiBreakdown) return [];
 
         let currentPeriodData = [];
         if (chartTimeRange === 'today') {
             currentPeriodData = [agent.apiBreakdown];
         } else {
             const days = chartTimeRange === 'week' ? 7 : 30;
-            // The dailyHistory already includes today because the backend updates it real-time.
-            currentPeriodData = (agent.dailyHistory || []).slice(0, days).map(d => d.breakdown || {});
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // dailyHistory에서 오늘 날짜 제거 (중복 방지)
+            const historyWithoutToday = (agent.dailyHistory || [])
+                .filter(d => d.date !== todayStr)
+                .slice(0, days - 1)  // 오늘을 포함하므로 days - 1
+                .map(d => d.breakdown || {});
+
+            // 오늘 데이터를 맨 앞에 추가 (가장 최신)
+            currentPeriodData = [agent.apiBreakdown, ...historyWithoutToday];
         }
 
         const sum = (types) => {
@@ -241,7 +263,7 @@ export function AgentDetailPage() {
             },
             {
                 id: '3d',
-                name: '3D 설치 이미지 생성',
+                name: '3D 설치 이미지 생성 (API Call)',
                 period: threeDCount,
                 total: threeDTotal,
                 icon: <PremiumIcon type="cube" color="#293ec5ff" size={20} />,
@@ -258,7 +280,37 @@ export function AgentDetailPage() {
                 label: chartTimeRange === 'today' ? 'Today' : chartTimeRange === 'week' ? 'Past 7 Days' : 'Past 30 Days'
             }
         ];
-    }, [agent.apiBreakdown, agent.dailyHistory, chartTimeRange]);
+    }, [agent, chartTimeRange]);
+
+    // 조건부 return은 모든 훅 호출 후에만 실행
+    if (agents.length === 0) {
+        // 아직 데이터가 로드되지 않음 (로딩 중)
+        return (
+            <div className="agent-detail-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+                <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                    <Activity size={48} style={{ margin: '0 auto 16px', opacity: 0.5, animation: 'spin 1s linear infinite' }} />
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>Loading...</h2>
+                    <p style={{ marginBottom: '24px' }}>Loading agent data...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!agent) {
+        // 데이터는 로드되었지만 해당 agent를 찾을 수 없음
+        return (
+            <div className="agent-detail-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+                <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                    <AlertCircle size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>Agent Not Found</h2>
+                    <p style={{ marginBottom: '24px' }}>The agent you are looking for does not exist.</p>
+                    <Link to="/agents" className="btn btn--primary">
+                        Return to Agents
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="agent-detail-page">
@@ -300,44 +352,58 @@ export function AgentDetailPage() {
 
             {/* KPI Cards */}
             <div className="kpi-grid">
-                <div className="kpi-card">
-                    <div className="kpi-icon-premium">
-                        <PremiumIcon type="api" color="rose" size={32} />
+                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                        <PremiumIcon type="tasks" color="blue" size={36} />
                     </div>
-                    <div className="kpi-label">Today API Calls</div>
-                    <div className="kpi-value">{formatNumber(agent.todayApiCalls)}</div>
-                    <div className="text-xs text-slate-500 pt-1">Total: {formatNumber(agent.totalApiCalls)}</div>
-                </div>
-
-                <div className="kpi-card">
-                    <div className="kpi-icon-premium">
-                        <PremiumIcon type="tasks" color="blue" size={32} />
-                    </div>
-                    <div className="kpi-label">Today Tasks</div>
-                    <div className="kpi-value">{formatNumber(agent.todayTasks)}</div>
-                    <div className="text-xs text-slate-400 pt-1">Target: 50</div>
-                </div>
-
-                <div className="kpi-card">
-                    <div className="kpi-icon-premium">
-                        <PremiumIcon type="success" color="emerald" size={32} />
-                    </div>
-                    <div className="kpi-label">Success Rate</div>
-                    <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
-                        {agent.apiStatus === 'error' ? '0.0%' : `${((1 - (agent.errorRate || 0)) * 100).toFixed(1)}%`}
-                    </div>
-                    <div className={`text-xs pt-1 ${agent.apiStatus === 'error' ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}
+                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                        <div className="kpi-label">Today Tasks</div>
+                        <div className="kpi-value">{formatNumber(agent.todayTasks)}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                            Total: {formatNumber(agent.totalTasks || Object.values(agent.apiBreakdown || {}).reduce((acc, v) => acc + (v.total || 0), 0))}
+                        </div>
                     </div>
                 </div>
 
-                <div className="kpi-card">
-                    <div className="kpi-icon-premium">
-                        <PremiumIcon type="latency" color="amber" size={32} />
+                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                        <PremiumIcon type="api" color="rose" size={36} />
                     </div>
-                    <div className="kpi-label">Avg Latency</div>
-                    <div className="kpi-value">{agent.avgResponseTime || 0}<span style={{ fontSize: '1rem', fontWeight: 600 }}>ms</span></div>
-                    <div className="text-xs text-slate-400 pt-1">Real-time stats</div>
+                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                        <div className="kpi-label">Today API Calls</div>
+                        <div className="kpi-value">{formatNumber(agent.todayApiCalls)}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                            Total: {formatNumber(agent.totalApiCalls)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                        <PremiumIcon type="latency" color="amber" size={36} />
+                    </div>
+                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                        <div className="kpi-label">Avg Latency</div>
+                        <div className="kpi-value">{agent.avgResponseTime || 0}<span style={{ fontSize: '1rem', fontWeight: 600 }}>ms</span></div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                            Real-time stats
+                        </div>
+                    </div>
+                </div>
+
+                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                        <PremiumIcon type="success" color="emerald" size={36} />
+                    </div>
+                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                        <div className="kpi-label">Success Rate</div>
+                        <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
+                            {agent.apiStatus === 'error' ? '0.0%' : `${((1 - (agent.errorRate || 0)) * 100).toFixed(1)}%`}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                            {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -393,29 +459,18 @@ export function AgentDetailPage() {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                    <XAxis 
-                                        dataKey="name" 
-                                        stroke="#64748b" 
-                                        fontSize={11} 
-                                        tickLine={false} 
-                                        axisLine={false} 
-                                        interval={0}
-                                        tickFormatter={(value) => {
-                                            if (!value) return '';
-                                            const currentHour = new Date().getHours();
-                                            const hour = parseInt(value.split(':')[0]);
-                                            
-                                            // 현재 시간 기준으로 최근 3시간은 모두 표시
-                                            // 예: 현재가 20시면 18, 19, 20 모두 표시
-                                            if (hour >= currentHour - 2 && hour <= currentHour) {
-                                                return value;
-                                            }
-                                            // 그 외는 3시간마다 표시 (0, 3, 6, 9, 12, 15, 18, 21)
-                                            if (hour % 3 === 0) {
-                                                return value;
-                                            }
-                                            return '';
-                                        }}
+                                    <XAxis
+                                        dataKey="name"
+                                        stroke="#64748b"
+                                        fontSize={10}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        ticks={chartTimeRange === 'today' ? xAxisTicks : undefined}
+                                        angle={chartTimeRange === 'today' ? -45 : 0}
+                                        textAnchor="end"
+                                        height={80}
+                                        minTickGap={-10}
+                                        allowDuplicatedCategory={true}
                                     />
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                                     <Tooltip

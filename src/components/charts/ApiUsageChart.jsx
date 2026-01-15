@@ -21,9 +21,10 @@ const CustomTooltip = ({ active, payload, label }) => {
                 boxShadow: 'var(--shadow-lg)'
             }}>
                 <p style={{
-                    color: 'var(--color-text-secondary)',
+                    color: 'var(--color-text-primary)',
                     fontSize: 'var(--font-size-xs)',
-                    marginBottom: '4px'
+                    marginBottom: '4px',
+                    fontWeight: 700
                 }}>{label}</p>
                 {payload.map((entry, index) => (
                     <p key={index} style={{
@@ -50,12 +51,12 @@ export function ApiUsageChart({ data, type = 'area' }) {
                 <ChartComponent data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                         <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                         </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -84,7 +85,7 @@ export function ApiUsageChart({ data, type = 'area' }) {
                                 type="monotone"
                                 dataKey="calls"
                                 name="API 호출"
-                                stroke="#6366f1"
+                                stroke="#ef4444"
                                 strokeWidth={2}
                                 fillOpacity={1}
                                 fill="url(#colorCalls)"
@@ -94,7 +95,7 @@ export function ApiUsageChart({ data, type = 'area' }) {
                                     type="monotone"
                                     dataKey="tasks"
                                     name="작업"
-                                    stroke="#22c55e"
+                                    stroke="#3b82f6"
                                     strokeWidth={2}
                                     fillOpacity={1}
                                     fill="url(#colorTasks)"
@@ -105,7 +106,7 @@ export function ApiUsageChart({ data, type = 'area' }) {
                         <Bar
                             dataKey="calls"
                             name="API 호출"
-                            fill="#6366f1"
+                            fill="#a855f7"
                             radius={[4, 4, 0, 0]}
                         />
                     )}

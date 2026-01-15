@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Zap, LogOut } from 'lucide-react';
 import {
     DashboardIcon,
@@ -25,7 +25,23 @@ import { useAuth } from '../../context/AuthContext';
 
 export function Sidebar({ isOpen, onClose }) {
     const location = useLocation();
+    const navigate = useNavigate();
     const { logout } = useAuth();
+
+    const handleLogout = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            // 로그아웃 시도 (성공/실패 상관없이 로그인 페이지로 이동)
+            await logout();
+            // 세션이 없어도 로그인 페이지로 리다이렉트
+            navigate('/login', { replace: true });
+        } catch (error) {
+            console.error('Logout error:', error);
+            // 에러가 있어도 로그인 페이지로 이동
+            navigate('/login', { replace: true });
+        }
+    };
 
     return (
         <>
@@ -85,7 +101,18 @@ export function Sidebar({ isOpen, onClose }) {
                             <div className="sidebar__user-name">Steve</div>
                             <div className="sidebar__user-role">Administrator</div>
                         </div>
-                        <button className="sidebar__logout-btn" onClick={logout}>
+                        <button 
+                            className="sidebar__logout-btn" 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleLogout(e);
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            type="button"
+                            aria-label="Logout"
+                            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                        >
                             <LogOut size={16} />
                         </button>
                     </div>

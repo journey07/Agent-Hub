@@ -73,7 +73,7 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
                     </div>
                 </div>
                 <div className="client-card__metric">
-                    <span className="client-card__metric-label">Calls Today</span>
+                    <span className="client-card__metric-label">API Calls Today</span>
                     <div className="client-card__metric-value text-emerald-600">
                         {formatCompactNumber(totalTodayCalls)}
                     </div>

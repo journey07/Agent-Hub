@@ -2,51 +2,26 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws'; // Keeping ws to avoid breaking client heartbeats immediately, but main logic moves to Supabase
 import cors from 'cors';
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { initSupabase } from './api/lib/supabase.js';
 
-// Load env vars
-dotenv.config({ path: '.env.local' });
-
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const PORT = process.env.PORT || 5001;
 
-// Initialize Supabase Client (Service Role logic would be better but Anon is okay for now if RLS allows or we use Service Role)
-// Ideally we should use Service Role key for backend to bypass RLS, but user only provided Anon Key.
-// However, the DB schema has RLS policies: "Allow service role full access".
-// If we use Anon key server-side, we act as an unauthenticated user unless we sign in.
-// BUT, we have "Allow authenticated read access" and maybe need write access.
-// Update: The schema has "Allow service role full access".
-// Since we only have ANON key in .env.local, we'll try to use it.
-// If RLS blocks writes (which it usually does for anon), we might fail.
-// Wait, the previous schema I applied allows "authenticated" users to read.
-// Does it allow "anon" write? No.
-// We need the SERVICE_ROLE key or we need to sign in as a user.
-// User didn't verify service role key yet.
-// Actually, looking at the schema:
-// "Allow service role full access on agents" ... TO service_role
-// "Allow authenticated read access" ... TO authenticated
-// There is NO policy for "anon" to insert/update.
-// This means using the ANON key here will FAIL for updates unless we use the SERVICE ROLE KEY.
-// The user has likely not put the service role key in .env.local.
-// I will verify this shortly. For now I will assume we might need to ask for it or use a trick (login as steve?).
-// Login as steve is safer.
+// Initialize Supabase Client with proper authentication
+let supabase;
+let supabaseInitialized = false;
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-        persistSession: false // Server-side, no local storage
+async function initializeSupabase() {
+    try {
+        const { supabase: client } = await initSupabase();
+        supabase = client;
+        supabaseInitialized = true;
+        console.log('✅ Brain Server Supabase client initialized');
+    } catch (error) {
+        console.error('❌ Failed to initialize Supabase:', error.message);
+        console.error('   Server will continue but database operations may fail.');
+        console.error('   Please check your .env.local file and ensure all required variables are set.');
+        process.exit(1); // Exit on initialization failure
     }
-});
-
-// Login as the system admin user to perform writes if using Anon Key
-async function systemLogin() {
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'steve@dashboard.local',
-        password: 'password123'
-    });
-    if (error) console.error('System login failed:', error.message);
-    else console.log('✅ Brain Server logged in as system user');
 }
 
 const app = express();
@@ -56,9 +31,23 @@ const wss = new WebSocketServer({ server: httpServer });
 app.use(cors());
 app.use(express.json());
 
+// Ensure Supabase is initialized before handling requests
+app.use(async (req, res, next) => {
+    if (!supabaseInitialized) {
+        await initializeSupabase();
+    }
+    next();
+});
+
 // Main Stats Endpoint (Receives updates from Agents)
 app.post('/api/stats', async (req, res) => {
     try {
+        if (!supabase) {
+            return res.status(503).json({ 
+                error: 'Database not initialized',
+                message: 'Supabase client failed to initialize. Please check server logs.'
+            });
+        }
         const {
             agentId,
             apiType,
@@ -158,7 +147,15 @@ app.post('/api/stats/check-manual', async (req, res) => {
     if (!agentId) return res.status(400).json({ error: 'agentId is required' });
 
     try {
+        if (!supabase) {
+            return res.status(503).json({ 
+                error: 'Database not initialized',
+                message: 'Supabase client failed to initialize. Please check server logs.'
+            });
+        }
+
         console.log(`🔘 Manual Check Triggered for ${agentId}`);
+        
         // Fetch agent from Supabase
         const { data: agent, error } = await supabase
             .from('agents')
@@ -166,7 +163,32 @@ app.post('/api/stats/check-manual', async (req, res) => {
             .eq('id', agentId)
             .single();
 
-        if (error || !agent) return res.status(404).json({ error: 'Agent not found' });
+        if (error) {
+            console.error(`❌ Supabase query error for ${agentId}:`, error);
+            // PGRST116 means no rows returned (not found)
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ 
+                    error: 'Agent not found',
+                    details: `No agent found with id: ${agentId}`,
+                    code: error.code
+                });
+            }
+            return res.status(500).json({ 
+                error: 'Database query failed',
+                details: error.message,
+                code: error.code
+            });
+        }
+
+        if (!agent) {
+            console.error(`❌ Agent ${agentId} query returned null`);
+            return res.status(404).json({ 
+                error: 'Agent not found',
+                details: `Query returned null for id: ${agentId}`
+            });
+        }
+
+        console.log(`✅ Found agent: ${agentId}, base_url: ${agent.base_url || 'null'}`);
 
         let newStatus = 'online';
         let newApiStatus = 'healthy';
@@ -177,33 +199,114 @@ app.post('/api/stats/check-manual', async (req, res) => {
         }
 
         try {
-            const healthRes = await fetch(`${agent.base_url}/api/quote/health`, { signal: AbortSignal.timeout(5000) });
+            const healthUrl = `${agent.base_url}/api/quote/health`;
+            console.log(`🔍 Checking health at: ${healthUrl}`);
+            
+            const healthRes = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
+            
             if (!healthRes.ok) {
+                const errorText = await healthRes.text().catch(() => 'Unknown error');
+                console.error(`❌ Health check failed: ${healthRes.status} ${healthRes.statusText} - ${errorText}`);
                 newStatus = 'offline';
                 newApiStatus = 'error';
             } else {
-                const verifyRes = await fetch(`${agent.base_url}/api/quote/verify-api`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+                console.log(`✅ Health check passed for ${agentId}`);
+                
+                // Verify API endpoint
+                const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
+                console.log(`🔍 Verifying API at: ${verifyUrl}`);
+                
+                const verifyRes = await fetch(verifyUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
+                
                 if (!verifyRes.ok) {
+                    const errorText = await verifyRes.text().catch(() => 'Unknown error');
+                    console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
                     newApiStatus = 'error';
                 } else {
                     const verifyData = await verifyRes.json();
                     newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    console.log(`✅ API verify result: ${newApiStatus}`);
                 }
             }
         } catch (err) {
+            console.error(`❌ Health check exception for ${agentId}:`, err.message);
+            console.error(`   Error type: ${err.name}, Cause: ${err.cause?.message || 'N/A'}`);
             newStatus = 'offline';
             newApiStatus = 'error';
         }
 
-        // Update Supabase
-        await supabase
+        // Update Supabase with status
+        const nowIso = new Date().toISOString();
+        const { error: updateError } = await supabase
             .from('agents')
             .update({
                 status: newStatus,
                 api_status: newApiStatus,
-                last_active: new Date().toISOString()
+                last_active: nowIso
             })
             .eq('id', agentId);
+
+        if (updateError) {
+            console.error(`❌ Failed to update agent status:`, updateError.message);
+        }
+
+        // Send heartbeat via /api/stats endpoint (same as agent's heartbeat)
+        // This ensures proper activity logging and updates
+        if (newApiStatus === 'healthy' && agent.base_url) {
+            try {
+                // Call the stats endpoint internally to send heartbeat
+                // In server.js, we can call the handler directly or use the same logic
+                const heartbeatData = {
+                    agentId: agentId,
+                    apiType: 'heartbeat',
+                    baseUrl: agent.base_url,
+                    model: agent.model || 'gemini-3-pro-image-preview',
+                    account: agent.account || 'admin@worldlocker.com',
+                    apiKey: agent.api_key || 'sk-unknown',
+                    shouldCountApi: false,
+                    shouldCountTask: false,
+                    responseTime: 0
+                };
+
+                // Process heartbeat using the same logic as /api/stats
+                const { error: hbError } = await supabase
+                    .from('agents')
+                    .update({
+                        last_active: nowIso,
+                        model: heartbeatData.model,
+                        base_url: heartbeatData.baseUrl,
+                        status: 'online'
+                    })
+                    .eq('id', agentId);
+
+                if (hbError) {
+                    console.error(`❌ Heartbeat update error:`, hbError.message);
+                } else {
+                    // Log heartbeat activity
+                    const { data: agentInfo } = await supabase
+                        .from('agents')
+                        .select('name, client_name, client_id')
+                        .eq('id', agentId)
+                        .single();
+                    
+                    const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
+                    await supabase
+                        .from('activity_logs')
+                        .insert({
+                            agent_id: agentId,
+                            action: `Heartbeat - ${agentName} (via status check)`,
+                            type: 'heartbeat',
+                            status: 'success',
+                            timestamp: nowIso,
+                            response_time: 0
+                        });
+                    
+                    console.log(`💓 Heartbeat sent via status check for ${agentId}`);
+                }
+            } catch (hbError) {
+                console.error(`⚠️ Failed to send heartbeat:`, hbError.message);
+            }
+        }
 
         res.json({ success: newApiStatus === 'healthy' });
     } catch (error) {
@@ -214,7 +317,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
 
 httpServer.listen(PORT, async () => {
-    console.log(`🧠 Dashboard Brain Server running on http://localhost:${PORT}`);
-    console.log(`⚡️ Now forwarding data to Supabase: ${supabaseUrl}`);
-    await systemLogin(); // Log in to allow writes with anon key (via RLS authenticated policy)
+    console.log(`🧠 Dashboard Brain Server starting on http://localhost:${PORT}`);
+    await initializeSupabase();
+    console.log(`⚡️ Server ready and connected to Supabase`);
 });

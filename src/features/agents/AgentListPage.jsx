@@ -24,22 +24,21 @@ export function AgentListPage() {
     });
 
     return (
-        <div className="page animate-slideUp">
-            {/* Agent Grid */}
-            <div className="grid grid--agents">
-                {filteredAgents.map(agent => (
-                    <AgentCard
-                        key={agent.id}
-                        agent={agent}
-                        client={clients.find(c => c.id === agent.clientId)}
-                        onToggle={toggleAgent}
-                        onHealthCheck={handleHealthCheck}
-                        isChecking={checkingId === agent.id}
-                    />
-                ))}
-            </div>
-
-            {filteredAgents.length === 0 && (
+        <div className={`page animate-slideUp ${filteredAgents.length === 0 ? 'page--centered' : ''}`}>
+            {filteredAgents.length > 0 ? (
+                <div className="grid grid--agents">
+                    {filteredAgents.map(agent => (
+                        <AgentCard
+                            key={agent.id}
+                            agent={agent}
+                            client={clients.find(c => c.id === agent.clientId)}
+                            onToggle={toggleAgent}
+                            onHealthCheck={handleHealthCheck}
+                            isChecking={checkingId === agent.id}
+                        />
+                    ))}
+                </div>
+            ) : (
                 <div className="empty-state">
                     <Bot className="empty-state__icon" />
                     <h3 className="empty-state__title">에이전트가 없습니다</h3>

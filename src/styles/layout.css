@@ -210,10 +210,17 @@
     border-radius: 12px;
     transition: background 0.2s;
     background: #f8fafc;
+    position: relative;
+    pointer-events: auto;
 }
 
 .sidebar__user:hover {
     background: #f1f5f9;
+}
+
+.sidebar__user:hover .sidebar__logout-btn {
+    background: #fee2e2;
+    color: #ef4444;
 }
 
 .sidebar__user-avatar {
@@ -250,8 +257,10 @@
 }
 
 .sidebar__logout-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -261,11 +270,26 @@
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.2s;
+    position: relative;
+    z-index: 100;
+    flex-shrink: 0;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .sidebar__logout-btn:hover {
     background: #fee2e2;
     color: #ef4444;
+}
+
+.sidebar__logout-btn:active {
+    transform: scale(0.95);
+    background: #fecaca;
+}
+
+.sidebar__logout-btn:focus {
+    outline: 2px solid #ef4444;
+    outline-offset: 2px;
 }
 
 .sidebar__collapse-btn {
@@ -453,6 +477,13 @@
 .page {
     max-width: var(--content-max-width);
     margin: 0 auto;
+}
+
+.page--centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
 }
 
 .page__header {

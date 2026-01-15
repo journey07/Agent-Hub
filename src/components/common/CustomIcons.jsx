@@ -50,13 +50,13 @@ export const WorldLockerIcon = ({ size = 24, className }) => (
 );
 
 // Dashboard Page Icons - Clean, no background style
-export const BotIcon = ({ size = 24, className, color = '#6366F1' }) => (
+export const BotIcon = ({ size = 24, className, color = '#6366F1', strokeWidth = 1.5 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M8 14C8.5 15.5 10 17 12 17C14 17 15.5 15.5 16 14" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 14C8.5 15.5 10 17 12 17C14 17 15.5 15.5 16 14" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
         <circle cx="9" cy="10" r="1.5" fill={color} />
         <circle cx="15" cy="10" r="1.5" fill={color} />
-        <path d="M12 2V0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M12 2V0" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
         <circle cx="12" cy="-1" r="1" fill={color} />
     </svg>
 );
@@ -78,9 +78,15 @@ export const ZapIconClean = ({ size = 24, className, color = '#3B82F6' }) => (
     </svg>
 );
 
-export const ActivityIconClean = ({ size = 24, className, color = '#10B981' }) => (
+export const ZapIconFilled = ({ size = 24, className }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-        <path d="M22 12H18L15 21L9 3L6 12H2" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13 2L4.09344 12.6879C3.74463 13.1064 3.57023 13.3157 3.56756 13.4925C3.56524 13.6461 3.63372 13.7923 3.75324 13.8889C3.89073 14 4.16316 14 4.70802 14H12L11 22L19.9065 11.3121C20.2553 10.8936 20.4297 10.6843 20.4324 10.5075C20.4347 10.3539 20.3662 10.2077 20.2467 10.1111C20.1092 10 19.8368 10 19.292 10H12L13 2Z" fill="currentColor" />
+    </svg>
+);
+
+export const ActivityIconClean = ({ size = 24, className, color = '#10B981', strokeWidth = 1.5 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <path d="M22 12H18L15 21L9 3L6 12H2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
 
@@ -118,6 +124,12 @@ export const ClockIconClean = ({ size = 24, className, color = '#6366F1' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
         <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" />
         <path d="M12 7V12L15 15" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
+export const ClockIconFilled = ({ size = 24, className }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <path fillRule="evenodd" clipRule="evenodd" d="M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12ZM12.75 6.75V12.25H16.25V13.75H11.25V6.75H12.75Z" fill="currentColor" />
     </svg>
 );
 
