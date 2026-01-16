@@ -68,11 +68,15 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-container animate-fade-in">
         <div className="login-card">
-          <div className="login-header">
-            <h1>Supersquad's<br className="mobile-break" /> Agent Hub</h1>
-          </div>
+          {/* backdrop-filter를 위한 별도 레이어 */}
+          <div className="login-card-backdrop"></div>
+          {/* 콘텐츠 레이어 */}
+          <div className="login-card-content">
+            <div className="login-header">
+              <h1>Supersquad's<br className="mobile-break" /> Agent Hub</h1>
+            </div>
 
-          <form onSubmit={handleSubmit} className="login-form">
+            <form onSubmit={handleSubmit} className="login-form">
             <div className="input-group">
               <div className="input-wrapper">
                 <input
@@ -135,6 +139,7 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+          </div>
         </div>
       </div>
     </div>
