@@ -69,7 +69,7 @@ export default function LoginPage() {
       <div className="login-container animate-fade-in">
         <div className="login-card">
           <div className="login-header">
-            <h1>Supersquad's Agent Hub</h1>
+            <h1>Supersquad's<br className="mobile-break" /> Agent Hub</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form">
