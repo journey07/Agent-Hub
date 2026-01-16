@@ -46,6 +46,31 @@ export function MainLayout() {
         setStatusFilter('all');
     }, [location.pathname]);
 
+    // Prevent body scroll on mobile when sidebar is open
+    useEffect(() => {
+        const isMobile = window.innerWidth <= 1024;
+        if (isMobile && sidebarOpen) {
+            // Save current scroll position
+            const scrollY = window.scrollY;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.width = '100%';
+            document.body.style.overflow = 'hidden';
+            
+            return () => {
+                // Restore scroll position when sidebar closes
+                const scrollY = document.body.style.top;
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.width = '';
+                document.body.style.overflow = '';
+                if (scrollY) {
+                    window.scrollTo(0, parseInt(scrollY || '0') * -1);
+                }
+            };
+        }
+    }, [sidebarOpen]);
+
     // Calculate filter counts for agents
     const agentFilterCounts = {
         all: agents.length,
@@ -73,7 +98,7 @@ export function MainLayout() {
                 <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
             </div>
 
-            <main className="app-layout__main">
+            <main className={`app-layout__main ${sidebarOpen ? 'app-layout__main--sidebar-open' : ''}`}>
                 <div className="app-layout__header">
                     <Header
                         title={title}

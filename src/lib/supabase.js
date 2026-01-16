@@ -10,12 +10,37 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Please check your .env.local file.');
 }
 
+// Custom storage implementation for remember me functionality
+class RememberMeStorage {
+    constructor(rememberMe = true) {
+        this.rememberMe = rememberMe;
+        this.storage = rememberMe ? localStorage : sessionStorage;
+    }
+
+    getItem(key) {
+        return this.storage.getItem(key);
+    }
+
+    setItem(key, value) {
+        this.storage.setItem(key, value);
+    }
+
+    removeItem(key) {
+        this.storage.removeItem(key);
+        // Also remove from the other storage to prevent conflicts
+        const otherStorage = this.rememberMe ? sessionStorage : localStorage;
+        otherStorage.removeItem(key);
+    }
+}
+
 // Create a single supabase client for interacting with your database
+// Default to localStorage (rememberMe = true)
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storage: new RememberMeStorage(true) // Default to localStorage
     },
     realtime: {
         params: {
@@ -25,6 +50,27 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
         log_level: 'info'
     }
 });
+
+/**
+ * Create a Supabase client with custom storage based on rememberMe setting
+ * @param {boolean} rememberMe - If true, uses localStorage. If false, uses sessionStorage.
+ */
+export function createSupabaseClient(rememberMe = true) {
+    return createClient(supabaseUrl || '', supabaseAnonKey || '', {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            storage: new RememberMeStorage(rememberMe)
+        },
+        realtime: {
+            params: {
+                eventsPerSecond: 10
+            },
+            log_level: 'info'
+        }
+    });
+}
 
 // Helper function to check connection status
 export async function testConnection() {

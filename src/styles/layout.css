@@ -8,7 +8,11 @@
 
 .app-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
 }
 
 .app-layout__sidebar {
@@ -25,11 +29,15 @@
 .app-layout__main {
     flex: 1;
     margin-left: var(--sidebar-width);
-    min-height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     background: #f8fafc;
     /* Light gray background for contrast with white cards */
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .app-layout__header {
@@ -45,13 +53,21 @@
 .app-layout__content {
     flex: 1;
     padding: var(--spacing-md);
+    padding-bottom: 50px;
     animation: fadeIn var(--transition-normal);
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-height: 0;
 }
 
 /* Mobile responsive */
 @media (max-width: 1024px) {
     .app-layout__sidebar {
         transform: translateX(-100%);
+        z-index: 1000 !important;
     }
 
     .app-layout__sidebar--open {
@@ -60,6 +76,38 @@
 
     .app-layout__main {
         margin-left: 0;
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Prevent main content from blocking sidebar clicks on mobile */
+    .app-layout__main--sidebar-open {
+        pointer-events: none !important;
+    }
+
+    .app-layout__main--sidebar-open * {
+        pointer-events: none !important;
+    }
+
+    .app-layout__main--sidebar-open .app-layout__header {
+        pointer-events: auto !important;
+    }
+
+    .app-layout__main--sidebar-open .app-layout__header * {
+        pointer-events: auto !important;
+    }
+
+    /* Ensure sidebar is clickable on mobile */
+    .app-layout__sidebar,
+    .app-layout__sidebar * {
+        pointer-events: auto !important;
+    }
+
+    .sidebar {
+        pointer-events: auto !important;
+        z-index: 1001 !important;
+        position: relative;
     }
 }
 
@@ -480,6 +528,9 @@
 .page {
     max-width: var(--content-max-width);
     margin: 0 auto;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .page--centered {
@@ -523,6 +574,10 @@
 .grid {
     display: grid;
     gap: var(--spacing-lg);
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .grid--2 {
@@ -554,6 +609,42 @@
 
 .grid--agents {
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+}
+
+/* Mobile: Prevent horizontal scroll */
+@media (max-width: 768px) {
+    .grid--agents {
+        grid-template-columns: 1fr;
+        min-width: 0;
+    }
+    
+    .page {
+        padding-left: 0;
+        padding-right: 0;
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .app-layout__content {
+        padding-left: var(--spacing-sm);
+        padding-right: var(--spacing-sm);
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Ensure all containers prevent horizontal scroll */
+    .app-layout,
+    .app-layout__main,
+    .app-layout__content,
+    .page,
+    .grid {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
 }
 
 /* ============================================
@@ -717,12 +808,22 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 90;
+    z-index: 999;
     animation: fadeIn var(--transition-fast);
+    pointer-events: auto;
 }
 
 @media (max-width: 1024px) {
     .sidebar-overlay--visible {
         display: block;
+    }
+    
+    /* Ensure overlay doesn't block sidebar */
+    .sidebar-overlay {
+        z-index: 999 !important;
+    }
+    
+    .app-layout__sidebar {
+        z-index: 1000 !important;
     }
 }

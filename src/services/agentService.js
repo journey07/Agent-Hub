@@ -171,6 +171,7 @@ export async function getSingleAgent(agentId) {
 
 /**
  * Fetch all agents with their complete stats
+ * Optimized: Uses batch queries instead of N+1 queries
  */
 export async function getAllAgents() {
     try {
@@ -181,55 +182,143 @@ export async function getAllAgents() {
             .order('sort_order', { ascending: true });
 
         if (agentsError) throw agentsError;
+        if (!agents || agents.length === 0) {
+            return { data: [], error: null };
+        }
 
-        // For each agent, fetch related data
-        const fullStats = await Promise.all(agents.map(async (agent) => {
-            const agentId = agent.id;
+        // Collect all agent IDs for batch queries
+        const agentIds = agents.map(agent => agent.id);
+        const todayKorea = getTodayInKoreaString();
 
-            // Fetch API breakdown
-            const { data: breakdownRows } = await supabase
+        // Batch fetch all related data in parallel (4 queries total instead of 4*N)
+        const [
+            { data: allBreakdownRows },
+            { data: allDailyStats },
+            { data: allHourlyStats },
+            { data: allActivityLogs }
+        ] = await Promise.all([
+            // 1. Fetch all API breakdowns in one query
+            supabase
                 .from('api_breakdown')
                 .select('*')
-                .eq('agent_id', agentId);
+                .in('agent_id', agentIds),
+            
+            // 2. Fetch all daily stats (last 30 days) in one query
+            supabase
+                .from('daily_stats')
+                .select('agent_id, date, tasks, api_calls, breakdown')
+                .in('agent_id', agentIds)
+                .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+                .order('date', { ascending: false }),
+            
+            // 3. Fetch all hourly stats (today only) in one query
+            supabase
+                .from('hourly_stats')
+                .select('agent_id, hour, tasks, api_calls, updated_at')
+                .in('agent_id', agentIds)
+                .eq('updated_at', todayKorea)
+                .order('hour'),
+            
+            // 4. Fetch recent activity logs for all agents
+            // Note: We'll get last 50 per agent, so we fetch more and filter in memory
+            supabase
+                .from('activity_logs')
+                .select('id, agent_id, action, status, timestamp, response_time')
+                .in('agent_id', agentIds)
+                .order('id', { ascending: false })
+                .limit(agentIds.length * 50) // Approximate: 50 per agent
+        ]);
 
+        // Create maps for efficient lookup
+        const breakdownMap = new Map();
+        (allBreakdownRows || []).forEach(row => {
+            const key = `${row.agent_id}_${row.api_type}`;
+            breakdownMap.set(key, {
+                today: row.today_count,
+                total: row.total_count
+            });
+        });
+
+        const dailyStatsMap = new Map();
+        (allDailyStats || []).forEach(row => {
+            if (!dailyStatsMap.has(row.agent_id)) {
+                dailyStatsMap.set(row.agent_id, []);
+            }
+            dailyStatsMap.get(row.agent_id).push({
+                date: row.date,
+                calls: row.api_calls,
+                tasks: row.tasks,
+                breakdown: row.breakdown || {}
+            });
+        });
+
+        const hourlyStatsMap = new Map();
+        (allHourlyStats || []).forEach(row => {
+            if (!hourlyStatsMap.has(row.agent_id)) {
+                hourlyStatsMap.set(row.agent_id, []);
+            }
+            hourlyStatsMap.get(row.agent_id).push({
+                hour: row.hour,
+                tasks: row.tasks,
+                apiCalls: row.api_calls,
+                updated_at: row.updated_at
+            });
+        });
+
+        // Group activity logs by agent_id and take last 50 per agent
+        const activityLogsMap = new Map();
+        (allActivityLogs || []).forEach(log => {
+            if (!activityLogsMap.has(log.agent_id)) {
+                activityLogsMap.set(log.agent_id, []);
+            }
+            const logs = activityLogsMap.get(log.agent_id);
+            if (logs.length < 50) {
+                logs.push({
+                    id: log.id,
+                    agent_id: log.agent_id,
+                    action: log.action,
+                    status: log.status,
+                    timestamp: log.timestamp,
+                    response_time: log.response_time,
+                    type: log.status,
+                    responseTime: log.response_time,
+                    agentId: log.agent_id
+                });
+            }
+        });
+
+        // Map data to each agent
+        const fullStats = agents.map(agent => {
+            const agentId = agent.id;
+
+            // Build API breakdown object
             const apiBreakdown = {};
-            (breakdownRows || []).forEach(row => {
-                apiBreakdown[row.api_type] = {
-                    today: row.today_count,
-                    total: row.total_count
-                };
+            (allBreakdownRows || []).forEach(row => {
+                if (row.agent_id === agentId) {
+                    apiBreakdown[row.api_type] = {
+                        today: row.today_count,
+                        total: row.total_count
+                    };
+                }
             });
 
-            // Fetch daily history (last 30 days)
-            const { data: dailyHistory } = await supabase
-                .from('daily_stats')
-                .select('date, tasks, api_calls, breakdown')
-                .eq('agent_id', agentId)
-                .order('date', { ascending: false })
-                .limit(30);
+            // Get daily history (limit to 30 most recent)
+            const dailyHistory = (dailyStatsMap.get(agentId) || [])
+                .slice(0, 30)
+                .map(row => ({
+                    ...row,
+                    calls: row.calls || row.api_calls,
+                    breakdown: row.breakdown || {}
+                }));
 
-            const parsedHistory = (dailyHistory || []).map(row => ({
-                ...row,
-                calls: row.api_calls,
-                breakdown: row.breakdown || {}
-            }));
-
-            // Fetch hourly stats (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
-            const todayKorea = getTodayInKoreaString();
-            
-            const { data: hourlyStats } = await supabase
-                .from('hourly_stats')
-                .select('hour, tasks, api_calls, updated_at')
-                .eq('agent_id', agentId)
-                .eq('updated_at', todayKorea)
-                .order('hour');
-
-            const hourlyData = (hourlyStats && hourlyStats.length > 0)
-                ? hourlyStats.map(row => ({
+            // Get hourly stats (today only)
+            const agentHourlyStats = hourlyStatsMap.get(agentId) || [];
+            const hourlyData = agentHourlyStats.length > 0
+                ? agentHourlyStats.map(row => ({
                     hour: row.hour,
                     tasks: row.tasks,
-                    apiCalls: row.api_calls,
-                    updated_at: row.updated_at  // 오늘 날짜 필터링용
+                    apiCalls: row.apiCalls || row.api_calls,
+                    updated_at: row.updated_at
                 }))
                 : Array.from({ length: 24 }, (_, i) => ({
                     hour: i.toString().padStart(2, '0'),
@@ -238,19 +327,9 @@ export async function getAllAgents() {
                     updated_at: todayKorea
                 }));
 
-            // Fetch activity logs (last 50)
-            const { data: logRows } = await supabase
-                .from('activity_logs')
-                .select('id, action, status, timestamp, response_time')
-                .eq('agent_id', agentId)
-                .order('id', { ascending: false })
-                .limit(50);
-
-            const activityLogs = (logRows || []).map(log => ({
+            // Get activity logs (last 50)
+            const activityLogs = (activityLogsMap.get(agentId) || []).map(log => ({
                 ...log,
-                type: log.status,
-                responseTime: log.response_time,
-                agentId,
                 agent: agent.name
             }));
 
@@ -271,11 +350,11 @@ export async function getAllAgents() {
                 isLiveAgent: !!agent.base_url,
                 // Additional data
                 apiBreakdown,
-                dailyHistory: parsedHistory,
+                dailyHistory,
                 hourlyStats: hourlyData,
                 activityLogs
             };
-        }));
+        });
 
         return { data: fullStats, error: null };
     } catch (error) {

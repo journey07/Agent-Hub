@@ -29,8 +29,8 @@ export function AuthProvider({ children }) {
         };
     }, []);
 
-    const login = async (username, password) => {
-        const result = await loginService(username, password);
+    const login = async (username, password, rememberMe = false) => {
+        const result = await loginService(username, password, rememberMe);
         if (result.success) {
             setSession(result.session);
             setUser(result.user);

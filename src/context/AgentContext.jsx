@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { safeAsync, safeAsyncWithRetry, getUserFriendlyMessage } from '../utils/errorHandler';
 import { getTodayInKorea, getTodayInKoreaString } from '../utils/formatters';
 import { useAuth } from './AuthContext';
+import { queryClient } from '../lib/queryClient';
 
 const AgentContext = createContext(null);
 
@@ -154,11 +155,41 @@ export function AgentProvider({ children }) {
     const [hourlyTraffic, setHourlyTraffic] = useState(() => calculateHourlyTraffic([]));
 
     // Simple function to refresh all data including charts
+    // Now with React Query caching support
     const refreshAllData = useCallback(async () => {
+        const queryKey = ['agents', 'all'];
+        
+        // Check cache first
+        const cachedData = queryClient.getQueryData(queryKey);
+        if (cachedData) {
+            // Use cached data immediately for fast UI update
+            const sortedAgents = [...cachedData].sort((a, b) => {
+                if (a.id === 'agent-worldlocker-001') return -1;
+                if (b.id === 'agent-worldlocker-001') return 1;
+                return 0;
+            });
+            const allLogs = cachedData.flatMap(agent => agent.activityLogs || []);
+            const sortedLogs = allLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            setAgents(sortedAgents);
+            setStats(calculateStats(sortedAgents));
+            setWeeklyApiUsage(calculateWeeklyApiUsage(sortedAgents));
+            setHourlyTraffic(calculateHourlyTraffic(sortedAgents));
+            setActivityLogs(sortedLogs);
+            setIsConnected(true);
+        }
+
+        // Fetch fresh data (will update cache and state)
         const result = await safeAsync(
             async () => {
                 const { data, error } = await getAllAgents();
                 if (error) throw error;
+                
+                // Cache the data
+                queryClient.setQueryData(queryKey, data, {
+                    updatedAt: Date.now()
+                });
+                
                 return data;
             },
             '전체 데이터 새로고침'
@@ -247,7 +278,27 @@ export function AgentProvider({ children }) {
 
     // Optimized polling: Refresh data every 5 seconds
     // 차트와 통계만 업데이트 (경량화)
+    // Now with React Query caching support
     const refreshStatsOnly = useCallback(async () => {
+        const queryKey = ['agents', 'stats-only'];
+        
+        // Check cache first for fast UI update
+        const cachedData = queryClient.getQueryData(queryKey);
+        if (cachedData?.agents) {
+            const sortedAgents = [...cachedData.agents].sort((a, b) => {
+                if (a.id === 'agent-worldlocker-001') return -1;
+                if (b.id === 'agent-worldlocker-001') return 1;
+                return 0;
+            });
+            setAgents(sortedAgents);
+            setStats(calculateStats(sortedAgents));
+            setWeeklyApiUsage(calculateWeeklyApiUsage(sortedAgents));
+            setHourlyTraffic(calculateHourlyTraffic(sortedAgents));
+            if (cachedData.logs) {
+                setActivityLogs(cachedData.logs);
+            }
+        }
+
         const result = await safeAsync(
             async () => {
                 // 에이전트 기본 정보만 가져오기 (경량)
@@ -307,7 +358,14 @@ export function AgentProvider({ children }) {
                     };
                 });
 
-                return { agents: agentsWithStats, logs: logsResult.data || [] };
+                const data = { agents: agentsWithStats, logs: logsResult.data || [] };
+                
+                // Cache the data
+                queryClient.setQueryData(queryKey, data, {
+                    updatedAt: Date.now()
+                });
+                
+                return data;
             },
             '경량 통계 새로고침'
         );
@@ -381,11 +439,16 @@ export function AgentProvider({ children }) {
     }, []);
 
     // Update single agent (partial update) with error handling
+    // Invalidates cache when agent is updated
     const updateSingleAgent = useCallback(async (agentId) => {
         const result = await safeAsync(
             async () => {
                 const { data: updatedAgent, error } = await getSingleAgent(agentId);
                 if (error) throw error;
+                
+                // Update cache for single agent
+                queryClient.setQueryData(['agents', agentId], updatedAgent);
+                
                 return updatedAgent;
             },
             `에이전트 ${agentId} 업데이트`
@@ -393,6 +456,11 @@ export function AgentProvider({ children }) {
 
         if (result.success && result.data) {
             const updatedAgent = result.data;
+            
+            // Invalidate related caches to trigger refetch
+            queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
+            queryClient.invalidateQueries({ queryKey: ['agents', 'stats-only'] });
+            
             setAgents(prev => {
                 const existingIndex = prev.findIndex(a => a.id === agentId);
                 let sorted;

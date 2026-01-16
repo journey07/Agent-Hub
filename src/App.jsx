@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AgentProvider } from './context/AgentContext';
 import { MainLayout } from './components/layout';
 import { DashboardPage } from './features/dashboard';
@@ -13,12 +14,14 @@ import './styles/layout.css';
 import { AuthProvider } from './context/AuthContext';
 import LoginPage from './features/auth/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { queryClient } from './lib/queryClient';
 
 function App() {
   return (
-    <AuthProvider>
-      <AgentProvider>
-        <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AgentProvider>
+          <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={
@@ -34,9 +37,10 @@ function App() {
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Routes>
-        </BrowserRouter>
-      </AgentProvider>
-    </AuthProvider>
+          </BrowserRouter>
+        </AgentProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

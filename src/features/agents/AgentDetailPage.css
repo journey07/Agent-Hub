@@ -171,7 +171,7 @@
 }
 
 .kpi-card:hover {
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-sm);
     border-color: var(--color-primary-100);
 }
 
@@ -205,15 +205,18 @@
 }
 
 .kpi-label {
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: #000000;
     margin-bottom: 4px;
+    font-family: "Outfit", sans-serif;
+    font-optical-sizing: auto;
+    font-style: normal;
 }
 
 .kpi-value {
-    font-size: 2rem;
-    font-weight: 800;
+    font-size: 1.75rem;
+    font-weight: 700;
     color: var(--color-text-primary);
     line-height: 1.1;
     margin-bottom: 4px;
@@ -255,6 +258,222 @@
     min-width: 360px;
 }
 
+/* Mobile: Remove min-width to prevent horizontal scroll */
+@media (max-width: 768px) {
+    .grid-item-task-perf,
+    .grid-item-system {
+        min-width: 0;
+    }
+    
+    /* Reset grid-column for mobile to show all sections */
+    .grid-item-task-perf,
+    .grid-item-system,
+    .grid-item-logs {
+        grid-column: 1;
+    }
+    
+    .agent-detail-page {
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .detail-content-grid {
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .kpi-grid {
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .detail-header {
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .detail-header .header-left {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .detail-header .detail-tabs {
+        width: auto;
+        max-width: 100%;
+        display: flex;
+        justify-content: center;
+        padding: 3px;
+        gap: 5px;
+    }
+    
+    .detail-header .detail-tabs .tab-btn {
+        padding: 7px 14px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    
+    /* Mobile: Optimize log display - time on top, log message below horizontally */
+    .log-entry {
+        flex-direction: column;
+        gap: 0;
+        padding: 12px;
+        font-size: 0.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: all 0.2s ease;
+        align-items: flex-start;
+    }
+    
+    .log-entry:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+    
+    .log-entry-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-bottom: 1px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        width: 100%;
+        justify-content: flex-start;
+        margin-bottom: 0;
+    }
+    
+    .log-entry .log-ts {
+        min-width: 0;
+        width: auto;
+        font-size: 0.65rem;
+        color: #94a3b8;
+        flex-shrink: 0;
+        font-weight: 500;
+        text-align: left;
+    }
+    
+    .log-entry .log-type {
+        min-width: 45px;
+        font-size: 0.65rem;
+        flex-shrink: 0;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .log-entry .log-latency {
+        font-size: 0.65rem;
+        flex-shrink: 0;
+    }
+    
+    .log-entry .log-msg {
+        width: 100%;
+        font-size: 0.8rem;
+        word-break: break-word;
+        white-space: normal;
+        padding-left: 0;
+        margin-top: 0;
+        padding-top: 0;
+        margin-bottom: 0;
+        line-height: 1.3;
+        color: #e2e8f0;
+        text-align: left;
+    }
+    
+    /* Recent logs in overview - mobile optimization */
+    .recent-log-item {
+        flex-wrap: nowrap;
+        gap: 0;
+        padding: 8px;
+        font-size: 0.75rem;
+    }
+    
+    .recent-log-item .log-ts {
+        min-width: 0;
+        width: auto;
+        font-size: 0.65rem;
+        flex-shrink: 0;
+        margin-right: 0;
+        padding-right: 0;
+    }
+    
+    .recent-log-item .log-msg {
+        flex: 1;
+        order: 0;
+        margin-top: 0;
+        margin-left: 0;
+        font-size: 0.8rem;
+        word-break: break-word;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        min-width: 0;
+    }
+    
+    .recent-log-item .log-type {
+        display: none;
+    }
+    
+    .recent-log-item .log-msg {
+        flex: 1;
+        order: 0;
+        margin-top: 0;
+        font-size: 0.8rem;
+        word-break: break-word;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        min-width: 0;
+    }
+    
+    .recent-log-item .log-latency {
+        display: none;
+    }
+    
+    /* Terminal body - mobile optimization */
+    .terminal-body {
+        padding: 12px;
+        font-size: 0.75rem;
+    }
+    
+    /* Mobile: Align "Connected via WebSocket" to the right */
+    .terminal-subtitle {
+        margin-left: auto;
+        text-align: right;
+    }
+    
+    /* Mobile: Reduce "Live Log Stream" font size */
+    .terminal-header .terminal-title {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Mobile: Reduce performance section font sizes to prevent modal cutoff */
+    .task-today-val {
+        font-size: 0.95rem;
+    }
+    
+    .task-name-text {
+        font-size: 0.85rem;
+    }
+    
+    .task-total-val {
+        font-size: 0.7rem;
+    }
+    
+    .task-item-premium {
+        padding: 12px;
+    }
+}
+
 .section-card {
     background: white;
     border: 1px solid var(--color-border);
@@ -278,7 +497,8 @@
 /* API Chart Section */
 .chart-wrapper {
     width: 100%;
-    height: 300px;
+    flex: 1;
+    min-height: 350px;
 }
 
 /* Recent Activity Mini List */
@@ -365,9 +585,12 @@
 }
 
 .info-value {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     color: var(--color-text-primary);
     font-weight: 500;
+    font-family: "Outfit", sans-serif;
+    font-optical-sizing: auto;
+    font-style: normal;
 }
 
 .info-divider {
@@ -453,6 +676,7 @@
 
 .log-entry {
     display: flex;
+    align-items: center;
     gap: 16px;
     padding: 4px 8px;
     border-radius: 4px;
@@ -460,6 +684,14 @@
     line-height: 1.5;
     transition: background 0.1s;
     animation: fadeIn 0.4s ease-in;
+}
+
+/* Desktop: log-entry-header should behave like inline flex with proper spacing */
+.log-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
 }
 
 .log-entry:hover {
@@ -492,6 +724,8 @@
 .log-latency {
     color: #94a3b8;
     font-size: 0.75rem;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .empty-logs {
@@ -593,20 +827,21 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    margin-top: 16px;
+    margin-top: 12px;
 }
 
 .task-item-premium {
     padding: 16px;
     background: rgba(255, 255, 255, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.15);
     border-radius: 12px;
     transition: all 0.3s ease;
 }
 
 .task-item-premium:hover {
     background: rgba(255, 255, 255, 0.7);
-    border-color: rgba(59, 130, 246, 0.3);
+    border-color: rgba(0, 0, 0, 0.4);
+    border-width: 1.5px;
 }
 
 .task-info-top {
@@ -723,6 +958,13 @@
     .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+    
+    /* Reset grid-column for tablet to show all sections */
+    .grid-item-task-perf,
+    .grid-item-system,
+    .grid-item-logs {
+        grid-column: 1;
+    }
 }
 
 @media (max-width: 640px) {
@@ -732,7 +974,27 @@
 
     .detail-header {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
         gap: 16px;
+    }
+    
+    .detail-header .header-left {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .detail-header .detail-tabs {
+        width: auto;
+        max-width: 100%;
+        display: flex;
+        justify-content: center;
+        padding: 3px;
+        gap: 5px;
+    }
+    
+    .detail-header .detail-tabs .tab-btn {
+        padding: 7px 14px;
+        font-size: 0.85rem;
+        white-space: nowrap;
     }
 }

@@ -2,9 +2,25 @@ import { get } from './lib/db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-steve-dashboard';
+// JWT_SECRET은 환경 변수에서 필수로 가져와야 함 (보안)
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// 환경 변수 검증: JWT_SECRET이 없으면 즉시 에러
+if (!JWT_SECRET) {
+    console.error('❌ CRITICAL: JWT_SECRET environment variable is not set!');
+    console.error('   Please set JWT_SECRET in your environment variables (.env.local or Vercel)');
+    console.error('   This is required for secure JWT token generation.');
+}
 
 export default async function handler(req, res) {
+    // JWT_SECRET이 없으면 로그인 요청 거부
+    if (!JWT_SECRET) {
+        console.error('Login attempt failed: JWT_SECRET not configured');
+        return res.status(500).json({ 
+            error: 'Server configuration error',
+            message: 'Authentication service is not properly configured. Please contact administrator.'
+        });
+    }
     // Basic CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');

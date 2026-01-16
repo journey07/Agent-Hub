@@ -99,7 +99,7 @@ export function Sidebar({ isOpen, onClose }) {
                         </div>
                         <div className="sidebar__user-info">
                             <div className="sidebar__user-name">Steve</div>
-                            <div className="sidebar__user-role">Administrator</div>
+                            <div className="sidebar__user-role">Admin</div>
                         </div>
                         <button 
                             className="sidebar__logout-btn" 

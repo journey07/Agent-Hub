@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { formatCompactNumber } from '../../utils/formatters';
 import { AnimatedNumber } from '../../components/common';
 
-export function StatCard({ label, value, iconColor = 'primary', className = '' }) {
+function StatCard({ label, value, iconColor = 'primary', className = '' }) {
     // 숫자 값 추출 및 애니메이션 처리
     const parseValue = () => {
         if (typeof value === 'number') {
@@ -96,4 +97,16 @@ export function StatCard({ label, value, iconColor = 'primary', className = '' }
     );
 }
 
-export default StatCard;
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when label, value, iconColor, or className change
+const MemoizedStatCard = memo(StatCard, (prevProps, nextProps) => {
+    return (
+        prevProps.label === nextProps.label &&
+        prevProps.value === nextProps.value &&
+        prevProps.iconColor === nextProps.iconColor &&
+        prevProps.className === nextProps.className
+    );
+});
+
+export { MemoizedStatCard as StatCard };
+export default MemoizedStatCard;

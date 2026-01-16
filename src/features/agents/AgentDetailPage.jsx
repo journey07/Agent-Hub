@@ -1,9 +1,9 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History, ExternalLink } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AnimatedNumber } from '../../components/common';
 import './AgentDetailPage.css';
 
@@ -44,7 +44,23 @@ export function AgentDetailPage() {
 
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'logs'
     const [chartTimeRange, setChartTimeRange] = useState('today'); // 'today' (others disabled for now)
+    // Initialize isMobile immediately to prevent initial render issues
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth <= 768;
+        }
+        return false;
+    });
     // Auto-scroll logic removed as logs are ordered newest-first (top)
+    
+    // Detect mobile screen size changes
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
@@ -53,14 +69,22 @@ export function AgentDetailPage() {
         return activityLogs.filter(log => log.agent === agent.name || log.agentId === agent.id);
     }, [activityLogs, agent]);
 
-    // 시간축 표시를 위한 ticks 계산 - 항상 0시부터 23시까지 모든 시간 표시
+    // 시간축 표시를 위한 ticks 계산 - 모바일에서는 3시간 간격, 데스크탑에서는 모든 시간
     const xAxisTicks = useMemo(() => {
         if (chartTimeRange === 'today') {
-            // 0시부터 23시까지 모든 시간을 명시적으로 지정
-            return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+            if (isMobile) {
+                // 모바일: 3시간 간격으로 표시 (0, 3, 6, 9, 12, 15, 18, 21) - "17" 형식
+                return Array.from({ length: 8 }, (_, i) => {
+                    const hour = i * 3;
+                    return hour.toString();
+                });
+            } else {
+                // 데스크탑: 0시부터 23시까지 모든 시간을 명시적으로 지정
+                return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+            }
         }
         return null; // 'today'가 아닌 경우는 기본 동작 사용
-    }, [chartTimeRange]);
+    }, [chartTimeRange, isMobile]);
 
     const chartData = useMemo(() => {
         if (!agent) return [];
@@ -94,7 +118,7 @@ export function AgentDetailPage() {
                 const hourStr = i.toString().padStart(2, '0');
                 const stat = statsMap.get(hourStr) || { tasks: 0, apiCalls: 0 };
                 return {
-                    name: `${hourStr}:00`,
+                    name: isMobile ? i.toString() : `${hourStr}:00`,
                     Tasks: Number(stat.tasks || 0),
                     'API Calls': Number(stat.apiCalls || 0)
                 };
@@ -378,7 +402,8 @@ export function AgentDetailPage() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards - Hide on mobile when Activity Feed is active */}
+            {!(isMobile && activeTab === 'logs') && (
             <div className="kpi-grid">
                 <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
@@ -448,12 +473,13 @@ export function AgentDetailPage() {
                     </div>
                 </div>
             </div>
+            )}
 
             {activeTab === 'overview' ? (
                 <div className="detail-content-grid">
                     {/* Row 1, Col 1: Chart */}
                     <div className="section-card chart-section grid-item-chart">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 className="section-title" style={{ marginBottom: 0 }}>
                                 <Activity size={20} className="text-blue-500" />
                                 {chartTimeRange === 'today' ? 'Hourly Activity' : 'Daily Activity'}
@@ -483,12 +509,12 @@ export function AgentDetailPage() {
                             </div>
                         </div>
 
-                        <div className="chart-wrapper" style={{ flex: 1, minHeight: '250px', width: '100%' }}>
+                        <div className="chart-wrapper" style={{ flex: 1, minHeight: '350px', width: '100%' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart
                                     key={chartTimeRange + (agent.hourlyStats?.length || 0)}
                                     data={chartData}
-                                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                    margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
                                 >
                                     <defs>
                                         <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
@@ -504,15 +530,18 @@ export function AgentDetailPage() {
                                     <XAxis
                                         dataKey="name"
                                         stroke="#64748b"
-                                        fontSize={10}
+                                        fontSize={isMobile ? 14 : 10}
                                         tickLine={false}
                                         axisLine={false}
                                         ticks={chartTimeRange === 'today' ? xAxisTicks : undefined}
-                                        angle={chartTimeRange === 'today' ? -45 : 0}
-                                        textAnchor="end"
-                                        height={80}
-                                        minTickGap={-10}
+                                        angle={isMobile ? 0 : (chartTimeRange === 'today' ? -45 : 0)}
+                                        textAnchor={isMobile ? "middle" : (chartTimeRange === 'today' ? "end" : "middle")}
+                                        height={isMobile ? 40 : 50}
+                                        minTickGap={isMobile ? 0 : -10}
                                         allowDuplicatedCategory={true}
+                                        interval={isMobile ? 0 : "preserveStartEnd"}
+                                        padding={chartTimeRange === 'today' ? { left: 0, right: 0 } : { left: 20, right: 20 }}
+                                        dx={chartTimeRange === 'today' ? 0 : 0}
                                     />
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                                     <Tooltip
@@ -575,7 +604,7 @@ export function AgentDetailPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <h3 className="section-title" style={{ marginBottom: 0 }}>
                                 <Database size={20} className="text-slate-500" />
-                                Task Performance
+                                {isMobile ? 'Task' : 'Task Performance'}
                             </h3>
                             <div className="detail-tabs" style={{ padding: '2px', borderRadius: '8px' }}>
                                 <button
@@ -616,24 +645,38 @@ export function AgentDetailPage() {
                         </h3>
                         <div className="recent-logs-list">
                             {agentLogs.length > 0 ? (
-                                agentLogs.slice(0, 5).map((log, idx) => (
-                                    <div key={log.id || idx} className="recent-log-item">
-                                        <span className="log-ts">
-                                            [{formatLogTimestamp(log.timestamp)}]
-                                        </span>
-                                        <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
-                                            {log.type ? log.type.toUpperCase() : 'INFO'}
-                                        </span>
-                                        <span className="log-msg">
-                                            {log.action}
-                                        </span>
-                                        {log.responseTime && (
-                                            <span className="log-latency">
-                                                {log.responseTime}ms
+                                agentLogs.slice(0, 5).map((log, idx) => {
+                                    // 모바일에서 시간 형식: "11:40"만 표시
+                                    const formatTimeForMobile = (dateString) => {
+                                        if (!dateString) return '-';
+                                        const date = new Date(dateString);
+                                        if (isNaN(date.getTime())) return '-';
+                                        const hours = String(date.getHours()).padStart(2, '0');
+                                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                                        return `${hours}:${minutes}`;
+                                    };
+                                    
+                                    return (
+                                        <div key={log.id || idx} className="recent-log-item">
+                                            <span className="log-ts">
+                                                [{isMobile ? formatTimeForMobile(log.timestamp) : formatLogTimestamp(log.timestamp)}]
                                             </span>
-                                        )}
-                                    </div>
-                                ))
+                                            {!isMobile && (
+                                                <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
+                                                    {log.type ? log.type.toUpperCase() : 'INFO'}
+                                                </span>
+                                            )}
+                                            <span className="log-msg">
+                                                {log.action}
+                                            </span>
+                                            {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
+                                                <span className="log-latency">
+                                                    {log.responseTime}ms
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <div className="empty-logs-mini">
                                     <Activity size={20} style={{ opacity: 0.5 }} />
@@ -652,17 +695,29 @@ export function AgentDetailPage() {
                         <div className="info-list">
                             <div className="info-item">
                                 <span className="info-label">Model Engine</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Cpu size={14} style={{ color: '#0ea5e9' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <Cpu size={18} style={{ color: '#0ea5e9' }} />
                                     <span className="info-value">{agent.model || 'Unknown Model'}</span>
                                 </div>
                             </div>
                             <div className="info-divider" />
                             <div className="info-item">
-                                <span className="info-label">API Account</span>
-                                <div className="api-key-box" style={{ marginTop: '8px' }}>
-                                    <span>{agent.account || agent.apiKey || 'No Account Linked'}</span>
-                                    {/* copy button removed as it's not as relevant for account email */}
+                                <span className="info-label">Account Info</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                                    <Key size={18} style={{ color: '#0ea5e9' }} />
+                                    <a 
+                                        href="https://aistudio.google.com/usage?timeRange=last-28-days&project=gen-lang-client-0280231890"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="info-value"
+                                        style={{ 
+                                            color: 'inherit',
+                                            textDecoration: 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Google AI Studio - counted07
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -685,16 +740,18 @@ export function AgentDetailPage() {
                                 <>
                                     {agentLogs.map((log, idx) => (
                                         <div key={log.id || idx} className="log-entry">
-                                            <span className="log-ts">
-                                                [{formatLogTimestamp(log.timestamp)}]
-                                            </span>
-                                            <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
-                                                {log.type ? log.type.toUpperCase() : 'INFO'}
-                                            </span>
+                                            <div className="log-entry-header">
+                                                <span className="log-ts">
+                                                    [{formatLogTimestamp(log.timestamp)}]
+                                                </span>
+                                                <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
+                                                    {log.type ? log.type.toUpperCase() : 'INFO'}
+                                                </span>
+                                            </div>
                                             <span className="log-msg">
                                                 {log.action}
                                             </span>
-                                            {log.responseTime && (
+                                            {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
                                                 <span className="log-latency">
                                                     {log.responseTime}ms
                                                 </span>

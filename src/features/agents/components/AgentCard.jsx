@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, ShieldCheck, Power, CheckCircle2 } from 'lucide-react';
 import { Toggle, AnimatedNumber } from '../../../components/common';
 import { formatNumber, formatRelativeTime } from '../../../utils/formatters';
 
-export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
+function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
     const [resultMessage, setResultMessage] = useState(null);
     const [isError, setIsError] = useState(false);
     
@@ -133,3 +133,27 @@ export function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }
         </div>
     );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when relevant props change
+const MemoizedAgentCard = memo(AgentCard, (prevProps, nextProps) => {
+    // Compare agent properties that affect rendering
+    const agentChanged = 
+        prevProps.agent.id !== nextProps.agent.id ||
+        prevProps.agent.status !== nextProps.agent.status ||
+        prevProps.agent.todayTasks !== nextProps.agent.todayTasks ||
+        prevProps.agent.todayApiCalls !== nextProps.agent.todayApiCalls ||
+        prevProps.agent.lastActive !== nextProps.agent.lastActive ||
+        prevProps.agent.apiStatus !== nextProps.agent.apiStatus ||
+        prevProps.agent.name !== nextProps.agent.name ||
+        prevProps.agent.clientId !== nextProps.agent.clientId;
+
+    // Compare other props
+    const clientChanged = prevProps.client?.id !== nextProps.client?.id;
+    const checkingChanged = prevProps.isChecking !== nextProps.isChecking;
+
+    // Return true if props are equal (skip re-render), false if different (re-render)
+    return !agentChanged && !clientChanged && !checkingChanged;
+});
+
+export { MemoizedAgentCard as AgentCard };

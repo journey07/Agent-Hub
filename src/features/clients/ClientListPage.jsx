@@ -4,11 +4,19 @@ import { ClientCard } from './components/ClientCard';
 
 export function ClientListPage() {
     const { clients, getAgentsByClient } = useAgents();
-    const { searchTerm, statusFilter } = useOutletContext();
+    const context = useOutletContext();
+    const searchTerm = context?.searchTerm || '';
+    const statusFilter = context?.statusFilter || 'all';
 
     const filteredClients = clients.filter(client => {
         const matchesPlan = statusFilter === 'all' || client.plan === statusFilter;
-        const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Safe search: handle undefined/null values
+        const safeSearchTerm = (searchTerm || '').toLowerCase();
+        const clientName = (client.name || '').toLowerCase();
+        
+        const matchesSearch = safeSearchTerm === '' || clientName.includes(safeSearchTerm);
+        
         return matchesPlan && matchesSearch;
     });
 

@@ -17,7 +17,7 @@ function getActivityIcon(log) {
     const action = (log.action || '').toLowerCase();
     
     // complete, generated, calculated가 포함되면 success
-    if (action.includes('complete') || action.includes('generated') || action.includes('calculated')) {
+    if (action.includes('completed') || action.includes('generated') || action.includes('calculated')) {
         return <CheckCircleIconClean size={20} />;
     }
     
@@ -85,7 +85,7 @@ export function DashboardPage() {
             <div className="grid grid--2 mb-xl gap-xl">
                 <section className="card">
                     <div className="card__header mb-lg">
-                        <h3 className="card__title">Weekly API Usage</h3>
+                        <h3 className="card__title">Weekly Agent Usage</h3>
                         {/* Period selector could go here */}
                     </div>
                     <ApiUsageChart data={weeklyApiUsage} type="area" />

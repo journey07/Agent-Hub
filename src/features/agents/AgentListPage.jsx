@@ -6,7 +6,9 @@ import { AgentCard } from './components/AgentCard';
 
 export function AgentListPage() {
     const { agents, clients, toggleAgent, checkAgentHealth } = useAgents();
-    const { searchTerm, statusFilter } = useOutletContext();
+    const context = useOutletContext();
+    const searchTerm = context?.searchTerm || '';
+    const statusFilter = context?.statusFilter || 'all';
     const [checkingId, setCheckingId] = useState(null);
 
     const handleHealthCheck = async (agentId) => {
@@ -18,8 +20,16 @@ export function AgentListPage() {
 
     const filteredAgents = agents.filter(agent => {
         const matchesStatus = statusFilter === 'all' || agent.status === statusFilter;
-        const matchesSearch = agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            agent.client.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Safe search: handle undefined/null values
+        const safeSearchTerm = (searchTerm || '').toLowerCase();
+        const agentName = (agent.name || '').toLowerCase();
+        const clientName = (agent.client || agent.client_name || '').toLowerCase();
+        
+        const matchesSearch = safeSearchTerm === '' || 
+            agentName.includes(safeSearchTerm) || 
+            clientName.includes(safeSearchTerm);
+        
         return matchesStatus && matchesSearch;
     });
 
