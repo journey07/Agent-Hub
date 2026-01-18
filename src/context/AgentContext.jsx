@@ -218,63 +218,87 @@ export function AgentProvider({ children }) {
         }
     }, []);
 
+    // 자정(00:00) 감지 및 자동 리셋 함수
+    // 한국 시간대 기준으로 날짜가 바뀌면 DB를 즉시 리셋하고 데이터 새로고침
+    // 최적화: localStorage 먼저 읽고, 날짜가 같으면 불필요한 연산 생략
+    const checkAndResetIfNeeded = useCallback(async () => {
+        const lastCheckedDateKey = 'dashboard_last_checked_date';
+        const storedDate = localStorage.getItem(lastCheckedDateKey);
+        
+        // 날짜가 저장되어 있지 않으면 초기 설정만 하고 리셋 불필요
+        if (!storedDate) {
+            const todayKorea = getTodayInKoreaString();
+            localStorage.setItem(lastCheckedDateKey, todayKorea);
+            return false;
+        }
+
+        // 오늘 날짜 확인 (날짜 비교를 위해만 호출)
+        const todayKorea = getTodayInKoreaString();
+
+        // 날짜가 바뀌지 않았으면 리셋 불필요
+        if (storedDate === todayKorea) {
+            return false;
+        }
+
+        // 날짜가 바뀌었으면 (자정이 지났으면) 리셋 실행
+        try {
+            console.log('🔄 날짜 변경 감지 - 통계 리셋 시작:', storedDate, '->', todayKorea);
+            
+            // DB에서 즉시 리셋 (모든 에이전트의 today 통계 리셋)
+            const { error: resetError } = await supabase.rpc('reset_today_stats_for_all_agents');
+            
+            if (resetError) {
+                console.error('❌ DB 리셋 실패:', resetError);
+            } else {
+                console.log('✅ DB 리셋 완료');
+            }
+
+            // 날짜 업데이트 (리셋 후 즉시 업데이트)
+            localStorage.setItem(lastCheckedDateKey, todayKorea);
+            
+            return true; // 리셋이 발생했음을 반환
+        } catch (error) {
+            console.error('❌ 자정 리셋 중 오류:', error);
+            // 오류가 나도 날짜는 업데이트 (다음 체크에서 다시 시도)
+            localStorage.setItem(lastCheckedDateKey, todayKorea);
+            return false;
+        }
+    }, []);
+
     // Load initial data from Supabase with error handling and retry
+    // 초기 로드 시 날짜 체크 및 리셋 포함
     useEffect(() => {
         async function fetchInitialData() {
             setIsLoading(true);
             setError(null);
 
+            // 1. 먼저 날짜 체크 및 리셋 (필요한 경우)
+            const wasReset = await checkAndResetIfNeeded();
+            
+            // 2. 데이터 새로고침 (리셋되었든 안 되었든 최신 데이터 가져오기)
             await refreshAllData();
 
             setIsLoading(false);
         }
 
         fetchInitialData();
-    }, [refreshAllData]);
+    }, [refreshAllData, checkAndResetIfNeeded]);
 
     // 자정(00:00) 감지 및 자동 리셋
-    // 한국 시간대 기준으로 날짜가 바뀌면 DB를 즉시 리셋하고 데이터 새로고침
+    // 1분마다 날짜 체크하여 자정이 지났는지 확인
     useEffect(() => {
-        // 초기 날짜 저장
-        const todayKorea = getTodayInKoreaString();
-        const lastCheckedDateKey = 'dashboard_last_checked_date';
-        const storedDate = localStorage.getItem(lastCheckedDateKey);
-        
-        if (!storedDate) {
-            localStorage.setItem(lastCheckedDateKey, todayKorea);
-        }
-
         // 1분마다 날짜 체크 (자정 감지)
         const midnightCheckInterval = setInterval(async () => {
-            const currentDateKorea = getTodayInKoreaString();
-            const lastCheckedDate = localStorage.getItem(lastCheckedDateKey);
-
-            // 날짜가 바뀌었으면 (자정이 지났으면)
-            if (lastCheckedDate && lastCheckedDate !== currentDateKorea) {
-                try {
-                    // 1. DB에서 즉시 리셋 (모든 에이전트의 today 통계 리셋)
-                    const { error: resetError } = await supabase.rpc('reset_today_stats_for_all_agents');
-                    
-                    if (resetError) {
-                        console.error('❌ DB 리셋 실패:', resetError);
-                        // 리셋 실패해도 데이터 새로고침은 진행
-                    }
-
-                    // 2. 데이터 새로고침 (리셋된 데이터 가져오기)
-                    await refreshAllData();
-
-                    // 3. 날짜 업데이트
-                    localStorage.setItem(lastCheckedDateKey, currentDateKorea);
-                } catch (error) {
-                    console.error('❌ 자정 리셋 중 오류:', error);
-                    // 오류가 나도 날짜는 업데이트 (다음 체크에서 다시 시도)
-                    localStorage.setItem(lastCheckedDateKey, currentDateKorea);
-                }
+            const wasReset = await checkAndResetIfNeeded();
+            
+            // 리셋이 발생했으면 데이터 새로고침
+            if (wasReset) {
+                await refreshAllData();
             }
         }, 60000); // 1분마다 체크
 
         return () => clearInterval(midnightCheckInterval);
-    }, [refreshAllData]);
+    }, [checkAndResetIfNeeded, refreshAllData]);
 
     // Optimized polling: Refresh data every 5 seconds
     // 차트와 통계만 업데이트 (경량화)

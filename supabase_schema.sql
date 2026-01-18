@@ -291,17 +291,23 @@ BEGIN
         updated_at = v_today;
 
     -- Update daily stats (using Korean timezone date)
-    INSERT INTO daily_stats (agent_id, date, tasks, api_calls)
+    -- breakdown도 함께 업데이트 (api_breakdown 테이블의 today_count를 기반으로)
+    INSERT INTO daily_stats (agent_id, date, tasks, api_calls, breakdown)
     VALUES (
         p_agent_id,
         v_today,
         CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
-        CASE WHEN p_should_count_api THEN 1 ELSE 0 END
+        CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
+        jsonb_build_object(p_api_type, 1)
     )
     ON CONFLICT (agent_id, date) DO UPDATE
     SET 
         tasks = daily_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
-        api_calls = daily_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END;
+        api_calls = daily_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
+        breakdown = COALESCE(daily_stats.breakdown, '{}'::jsonb) || jsonb_build_object(
+            p_api_type, 
+            COALESCE((daily_stats.breakdown->>p_api_type)::integer, 0) + 1
+        );
 END;
 $$;
 

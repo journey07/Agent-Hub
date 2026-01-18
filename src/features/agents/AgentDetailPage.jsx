@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History, ExternalLink } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
-import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString } from '../../utils/formatters';
+import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString, getTodayInKorea } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo, useEffect } from 'react';
 import { AnimatedNumber } from '../../components/common';
@@ -265,7 +265,9 @@ export function AgentDetailPage() {
     };
 
     const taskPerformanceData = useMemo(() => {
-        if (!agent || !agent.apiBreakdown) return [];
+        if (!agent || !agent.apiBreakdown) {
+            return [];
+        }
 
         let currentPeriodData = [];
         if (chartTimeRange === 'today') {
@@ -274,24 +276,75 @@ export function AgentDetailPage() {
             const days = chartTimeRange === 'week' ? 7 : 30;
             // Use Korean timezone (24시 기준 = 자정 00:00)
             const todayStr = getTodayInKoreaString();
+            const today = getTodayInKorea();
+            
+            // 날짜 범위 계산: 오늘부터 (days - 1)일 전까지
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - (days - 1));
+            // 시간을 00:00:00으로 설정하여 날짜 비교 정확도 향상
+            startDate.setHours(0, 0, 0, 0);
 
-            // dailyHistory에서 오늘 날짜 제거 (중복 방지)
-            const historyWithoutToday = (agent.dailyHistory || [])
-                .filter(d => d.date !== todayStr)
-                .slice(0, days - 1)  // 오늘을 포함하므로 days - 1
-                .map(d => d.breakdown || {});
+            // dailyHistory에서 날짜 범위 내의 데이터만 필터링 (오늘 제외)
+            const filteredByDate = (agent.dailyHistory || [])
+                .filter(d => {
+                    if (!d.date) return false;
+                    // 날짜 문자열을 Date 객체로 변환 (YYYY-MM-DD 형식)
+                    const date = new Date(d.date + 'T00:00:00');
+                    // 시간을 00:00:00으로 설정하여 날짜 비교 정확도 향상
+                    date.setHours(0, 0, 0, 0);
+                    // 날짜 범위 내이고 오늘 날짜가 아닌 것만 포함
+                    const inRange = date >= startDate && d.date !== todayStr;
+                    return inRange;
+                });
+            
+            const historyWithoutToday = filteredByDate
+                .map(d => {
+                    // breakdown이 비어있지 않은지 확인
+                    let breakdown = d.breakdown;
+                    
+                    // breakdown이 문자열인 경우 (JSONB가 문자열로 파싱된 경우)
+                    if (typeof breakdown === 'string') {
+                        try {
+                            breakdown = JSON.parse(breakdown);
+                        } catch (e) {
+                            breakdown = {};
+                        }
+                    }
+                    
+                    // breakdown이 null이거나 undefined인 경우
+                    if (!breakdown || typeof breakdown !== 'object') {
+                        breakdown = {};
+                    }
+                    
+                    // breakdown이 객체이고 키가 있는지 확인
+                    if (Object.keys(breakdown).length > 0) {
+                        return breakdown;
+                    }
+                    return {};
+                })
+                .filter(b => Object.keys(b).length > 0); // 빈 breakdown 제거
 
             // 오늘 데이터를 맨 앞에 추가 (가장 최신)
+            // breakdown이 비어있어도 최소한 오늘 데이터는 보여줌
             currentPeriodData = [agent.apiBreakdown, ...historyWithoutToday];
         }
 
         const sum = (types) => {
+            if (!currentPeriodData || currentPeriodData.length === 0) {
+                return 0;
+            }
             return currentPeriodData.reduce((acc, day) => {
+                if (!day || typeof day !== 'object') {
+                    return acc;
+                }
                 const daySum = types.reduce((dacc, t) => {
                     const val = day[t];
+                    if (val === null || val === undefined) {
+                        return dacc;
+                    }
                     // Handle both structures: {today, total} for Today tab or Number for History
                     if (val && typeof val === 'object' && 'today' in val) {
-                        return dacc + (val.today || 0);
+                        return dacc + (Number(val.today) || 0);
                     }
                     return dacc + (Number(val) || 0);
                 }, 0);
