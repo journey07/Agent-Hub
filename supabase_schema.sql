@@ -83,12 +83,16 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     status TEXT,
     timestamp TIMESTAMPTZ DEFAULT NOW(),
     response_time INTEGER,
+    user_name TEXT, -- 사용자명 (users 테이블의 name 컬럼 값)
     FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
 );
 
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS idx_activity_logs_agent_timestamp 
     ON activity_logs(agent_id, timestamp DESC);
+
+-- Add user_name column to existing table (if table already exists)
+ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
 
 -- ============================================
 -- Row Level Security (RLS) Policies

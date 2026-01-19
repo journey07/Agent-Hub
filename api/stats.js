@@ -69,7 +69,8 @@ export default async function handler(req, res) {
             status,
             logAction,
             logMessage,
-            logType
+            logType,
+            userName // 사용자명 (users 테이블의 name 컬럼 값)
         } = req.body;
 
         const actionToLog = logAction || logMessage;
@@ -113,7 +114,8 @@ export default async function handler(req, res) {
                         type: 'heartbeat',
                         status: 'success',
                         timestamp: nowIso,
-                        response_time: responseTime || 0
+                        response_time: responseTime || 0,
+                        user_name: userName || null
                     });
                 if (logError) {
                     console.error(`⚠️ Failed to log heartbeat activity [${agentId}]:`, logError.message);
@@ -131,7 +133,8 @@ export default async function handler(req, res) {
                         type: 'heartbeat',
                         status: 'success',
                         timestamp: nowIso,
-                        response_time: responseTime || 0
+                        response_time: responseTime || 0,
+                        user_name: userName || null
                     });
 
                 if (logError) {
@@ -194,7 +197,8 @@ export default async function handler(req, res) {
                     type: apiType === 'activity_log' ? 'log' : apiType,
                     status: logType || (isError ? 'error' : 'success'),
                     timestamp: new Date().toISOString(),
-                    response_time: responseTime || 0
+                    response_time: responseTime || 0,
+                    user_name: userName || null
                 });
             if (logError) {
                 console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
