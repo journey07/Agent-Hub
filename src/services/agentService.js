@@ -10,7 +10,7 @@ export async function getRecentActivityLogs(limit = 100) {
         // Fetch logs
         const { data: logRows, error: logsError } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, status, timestamp, response_time')
+            .select('id, agent_id, action, status, timestamp, response_time, user_name')
             .order('id', { ascending: false })
             .limit(limit);
 
@@ -41,7 +41,8 @@ export async function getRecentActivityLogs(limit = 100) {
             type: log.status,
             responseTime: log.response_time,
             agentId: log.agent_id,
-            agent: agentMap.get(log.agent_id) || log.agent_id
+            agent: agentMap.get(log.agent_id) || log.agent_id,
+            userName: log.user_name || null
         }));
 
         return { data: activityLogs, error: null };
@@ -127,7 +128,7 @@ export async function getSingleAgent(agentId) {
         // Fetch activity logs (last 50)
         const { data: logRows } = await supabase
             .from('activity_logs')
-            .select('id, action, status, timestamp, response_time')
+            .select('id, action, status, timestamp, response_time, user_name')
             .eq('agent_id', agentId)
             .order('id', { ascending: false })
             .limit(50);
@@ -137,7 +138,8 @@ export async function getSingleAgent(agentId) {
             type: log.status,
             responseTime: log.response_time,
             agentId,
-            agent: agent.name
+            agent: agent.name,
+            userName: log.user_name || null
         }));
 
         const fullAgent = {
@@ -223,7 +225,7 @@ export async function getAllAgents() {
             // Note: We'll get last 50 per agent, so we fetch more and filter in memory
             supabase
                 .from('activity_logs')
-                .select('id, agent_id, action, status, timestamp, response_time')
+                .select('id, agent_id, action, status, timestamp, response_time, user_name')
                 .in('agent_id', agentIds)
                 .order('id', { ascending: false })
                 .limit(agentIds.length * 50) // Approximate: 50 per agent
@@ -282,7 +284,8 @@ export async function getAllAgents() {
                     response_time: log.response_time,
                     type: log.status,
                     responseTime: log.response_time,
-                    agentId: log.agent_id
+                    agentId: log.agent_id,
+                    userName: log.user_name || null
                 });
             }
         });
@@ -330,7 +333,8 @@ export async function getAllAgents() {
             // Get activity logs (last 50)
             const activityLogs = (activityLogsMap.get(agentId) || []).map(log => ({
                 ...log,
-                agent: agent.name
+                agent: agent.name,
+                userName: log.userName || null
             }));
 
             return {

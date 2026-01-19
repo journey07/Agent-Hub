@@ -14,19 +14,10 @@ import {
 
 // action 텍스트를 기반으로 아이콘 결정
 function getActivityIcon(log) {
-    const action = (log.action || '').toLowerCase();
-    
-    // complete, generated, calculated가 포함되면 success
-    if (action.includes('completed') || action.includes('generated') || action.includes('calculated')) {
-        return <CheckCircleIconClean size={20} />;
+    // type 기반 매칭을 먼저 체크 (heartbeat는 항상 하트 아이콘)
+    if (log.type === 'heartbeat') {
+        return <HeartIconClean size={20} color="#EF4444" />;
     }
-    
-    // calling으로 시작하면 processing
-    if (action.startsWith('calling') || action.includes('calling')) {
-        return <ClockIconClean size={20} />;
-    }
-    
-    // type 기반 매칭 (기존 로직 유지)
     if (log.type === 'success') {
         return <CheckCircleIconClean size={20} />;
     }
@@ -42,8 +33,18 @@ function getActivityIcon(log) {
     if (log.type === 'log') {
         return <InfoIconClean size={20} />;
     }
-    if (log.type === 'heartbeat') {
-        return <HeartIconClean size={20} color="#EF4444" />;
+    
+    // action 텍스트 기반 매칭 (type이 없거나 매칭되지 않은 경우)
+    const action = (log.action || '').toLowerCase();
+    
+    // complete, generated, calculated가 포함되면 success
+    if (action.includes('completed') || action.includes('generated') || action.includes('calculated')) {
+        return <CheckCircleIconClean size={20} />;
+    }
+    
+    // calling으로 시작하면 processing
+    if (action.startsWith('calling') || action.includes('calling')) {
+        return <ClockIconClean size={20} />;
     }
     
     // 기본값: info
@@ -117,8 +118,17 @@ export function DashboardPage() {
                                     {getActivityIcon(log)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-semibold text-slate-900">{log.agent}</div>
-                                    <div className="text-xs text-slate-500">{log.action}</div>
+                                    <div className="text-sm font-semibold text-slate-900">
+                                        {log.agent}
+                                        {log.userName && !log.action?.includes('User login') && (
+                                            <span style={{ color: '#94a3b8', fontWeight: 'normal', marginLeft: '6px' }}>
+                                                - {log.userName}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-slate-500">
+                                        {log.action}
+                                    </div>
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium ml-auto text-right whitespace-nowrap">
                                     {formatRelativeTime(log.timestamp)}

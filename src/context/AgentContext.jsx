@@ -679,7 +679,8 @@ export function AgentProvider({ children }) {
                             type: newLog.type || newLog.status || 'info',
                             status: newLog.status || 'success',
                             timestamp: newLog.timestamp || new Date().toISOString(),
-                            responseTime: newLog.response_time || 0
+                            responseTime: newLog.response_time || 0,
+                            userName: newLog.user_name || null
                         };
                         
                         // 최신 로그를 맨 위에 추가하고 최대 100개만 유지

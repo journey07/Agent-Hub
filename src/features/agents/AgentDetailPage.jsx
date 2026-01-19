@@ -721,6 +721,11 @@ export function AgentDetailPage() {
                                             )}
                                             <span className="log-msg">
                                                 {log.action}
+                                                {log.userName && (
+                                                    <span style={{ color: '#64748b', fontSize: '0.9em', marginLeft: '8px' }}>
+                                                        - {log.userName}
+                                                    </span>
+                                                )}
                                             </span>
                                             {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
                                                 <span className="log-latency">
@@ -803,6 +808,11 @@ export function AgentDetailPage() {
                                             </div>
                                             <span className="log-msg">
                                                 {log.action}
+                                                {log.userName && (
+                                                    <span style={{ color: '#64748b', fontSize: '0.9em', marginLeft: '8px' }}>
+                                                        - {log.userName}
+                                                    </span>
+                                                )}
                                             </span>
                                             {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
                                                 <span className="log-latency">
