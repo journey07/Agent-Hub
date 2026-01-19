@@ -10,7 +10,7 @@ export async function getRecentActivityLogs(limit = 100) {
         // Fetch logs
         const { data: logRows, error: logsError } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, status, timestamp, response_time, user_name')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
             .order('id', { ascending: false })
             .limit(limit);
 
@@ -36,9 +36,10 @@ export async function getRecentActivityLogs(limit = 100) {
         });
 
         // Map logs with agent names
+        // type 필드가 있으면 사용하고, 없으면 status를 fallback으로 사용
         const activityLogs = logRows.map(log => ({
             ...log,
-            type: log.status,
+            type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
             responseTime: log.response_time,
             agentId: log.agent_id,
             agent: agentMap.get(log.agent_id) || log.agent_id,
@@ -128,14 +129,14 @@ export async function getSingleAgent(agentId) {
         // Fetch activity logs (last 50)
         const { data: logRows } = await supabase
             .from('activity_logs')
-            .select('id, action, status, timestamp, response_time, user_name')
+            .select('id, action, type, status, timestamp, response_time, user_name')
             .eq('agent_id', agentId)
             .order('id', { ascending: false })
             .limit(50);
 
         const activityLogs = (logRows || []).map(log => ({
             ...log,
-            type: log.status,
+            type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
             responseTime: log.response_time,
             agentId,
             agent: agent.name,
@@ -225,7 +226,7 @@ export async function getAllAgents() {
             // Note: We'll get last 50 per agent, so we fetch more and filter in memory
             supabase
                 .from('activity_logs')
-                .select('id, agent_id, action, status, timestamp, response_time, user_name')
+                .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
                 .in('agent_id', agentIds)
                 .order('id', { ascending: false })
                 .limit(agentIds.length * 50) // Approximate: 50 per agent
@@ -282,7 +283,7 @@ export async function getAllAgents() {
                     status: log.status,
                     timestamp: log.timestamp,
                     response_time: log.response_time,
-                    type: log.status,
+                    type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
                     responseTime: log.response_time,
                     agentId: log.agent_id,
                     userName: log.user_name || null
