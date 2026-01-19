@@ -4,10 +4,26 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Validate environment variables
+// Validate environment variables - throw error if missing
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables!');
-    console.error('Please check your .env.local file.');
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+    if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+    
+    const errorMessage = `❌ Missing required environment variables: ${missingVars.join(', ')}\n\n` +
+        `Please create a .env.local file in the Dashboard directory with:\n` +
+        `VITE_SUPABASE_URL=your_supabase_url\n` +
+        `VITE_SUPABASE_ANON_KEY=your_supabase_anon_key\n\n` +
+        `Check ENV_SETUP.md or INTEGRATION_SETUP.md for details.`;
+    
+    console.error(errorMessage);
+    
+    // Store error for UI display
+    if (typeof window !== 'undefined') {
+        window.__SUPABASE_CONFIG_ERROR__ = errorMessage;
+    }
+    
+    // Don't throw here - let the app show the error UI
 }
 
 // Custom storage implementation for remember me functionality
@@ -35,7 +51,12 @@ class RememberMeStorage {
 
 // Create a single supabase client for interacting with your database
 // Default to localStorage (rememberMe = true)
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+// Note: If env vars are missing, this will create an invalid client
+// The app should check for this and show an error UI
+export const supabase = createClient(
+    supabaseUrl || 'https://placeholder.supabase.co', 
+    supabaseAnonKey || 'placeholder-key', 
+    {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -56,7 +77,10 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
  * @param {boolean} rememberMe - If true, uses localStorage. If false, uses sessionStorage.
  */
 export function createSupabaseClient(rememberMe = true) {
-    return createClient(supabaseUrl || '', supabaseAnonKey || '', {
+    return createClient(
+        supabaseUrl || 'https://placeholder.supabase.co', 
+        supabaseAnonKey || 'placeholder-key', 
+        {
         auth: {
             persistSession: true,
             autoRefreshToken: true,

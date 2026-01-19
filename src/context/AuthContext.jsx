@@ -10,23 +10,39 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         // Check active session on mount
-        getCurrentSession().then(({ session }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        getCurrentSession()
+            .then(({ session, error }) => {
+                if (error) {
+                    console.error('Failed to get session:', error);
+                    // Don't block the app if session check fails
+                }
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+            })
+            .catch((error) => {
+                console.error('Error getting session:', error);
+                // Set loading to false even on error to prevent infinite loading
+                setLoading(false);
+            });
 
         // Listen for auth state changes
-        const { data: { subscription } } = onAuthStateChange((event, session) => {
-            console.log('Auth state changed:', event);
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        try {
+            const { data: { subscription } } = onAuthStateChange((event, session) => {
+                console.log('Auth state changed:', event);
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+            });
 
-        return () => {
-            subscription?.unsubscribe();
-        };
+            return () => {
+                subscription?.unsubscribe();
+            };
+        } catch (error) {
+            console.error('Error setting up auth state listener:', error);
+            // Set loading to false even if listener setup fails
+            setLoading(false);
+        }
     }, []);
 
     const login = async (username, password, rememberMe = false) => {
