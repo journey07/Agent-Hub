@@ -39,7 +39,9 @@ ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
 
 ```bash
 # .env 파일 또는 배포 환경 변수
-DASHBOARD_API_URL=https://your-dashboard.vercel.app/api/stats
+DASHBOARD_API_URL=https://hub.supersquad.kr/api/stats
+# 또는 기존 URL 사용 가능:
+# DASHBOARD_API_URL=https://agenthub-tau.vercel.app/api/stats
 ```
 
 **설정 위치:**

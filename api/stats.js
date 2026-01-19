@@ -75,7 +75,7 @@ export default async function handler(req, res) {
 
         const actionToLog = logAction || logMessage;
 
-        console.log(`📥 Incoming API Call: ${agentId} - ${apiType} ${actionToLog ? `(Log: ${actionToLog})` : ''}`);
+        console.log(`📥 Incoming API Call: ${agentId} - ${apiType} ${actionToLog ? `(Log: ${actionToLog})` : ''} ${userName ? `[User: ${userName}]` : '[No User]'}`);
 
         // 1. Handle Heartbeat (Registration)
         if (apiType === 'heartbeat') {
@@ -189,21 +189,29 @@ export default async function handler(req, res) {
                 finalAction = `Calculated ${finalAction}`;
             }
             
-            const { error: logError } = await supabase
+            const logData = {
+                agent_id: agentId,
+                action: finalAction,
+                type: apiType === 'activity_log' ? 'log' : apiType,
+                status: logType || (isError ? 'error' : 'success'),
+                timestamp: new Date().toISOString(),
+                response_time: responseTime || 0,
+                user_name: userName || null
+            };
+            
+            console.log(`📝 Inserting log to activity_logs:`, JSON.stringify(logData, null, 2));
+            
+            const { error: logError, data: logDataResult } = await supabase
                 .from('activity_logs')
-                .insert({
-                    agent_id: agentId,
-                    action: finalAction,
-                    type: apiType === 'activity_log' ? 'log' : apiType,
-                    status: logType || (isError ? 'error' : 'success'),
-                    timestamp: new Date().toISOString(),
-                    response_time: responseTime || 0,
-                    user_name: userName || null
-                });
+                .insert(logData)
+                .select();
+                
             if (logError) {
-                console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
+                console.error(`❌ Activity Log Error [${agentId}]:`, logError);
+                console.error('Log data that failed:', logData);
             } else {
-                console.log(`📋 Logged: ${agentId} - ${actionToLog}`);
+                console.log(`✅ Logged successfully: ${agentId} - ${actionToLog} [User: ${userName || 'null'}]`);
+                console.log('Inserted log ID:', logDataResult?.[0]?.id);
             }
         }
 
