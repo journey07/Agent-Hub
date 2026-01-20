@@ -774,7 +774,7 @@ export function AgentDetailPage() {
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        Google AI Studio - counted07
+                                        Google AI Studio - worldlocker.ax
                                     </a>
                                 </div>
                             </div>
