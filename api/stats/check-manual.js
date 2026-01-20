@@ -70,13 +70,13 @@ export default async function handler(req, res) {
             console.error(`❌ Supabase query error for ${agentId}:`, error);
             // PGRST116 means no rows returned (not found)
             if (error.code === 'PGRST116') {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     error: 'Agent not found',
                     details: `No agent found with id: ${agentId}`,
                     code: error.code
                 });
             }
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Database query failed',
                 details: error.message,
                 code: error.code
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
 
         if (!agent) {
             console.error(`❌ Agent ${agentId} query returned null`);
-            return res.status(404).json({ 
+            return res.status(404).json({
                 error: 'Agent not found',
                 details: `Query returned null for id: ${agentId}`
             });
@@ -101,11 +101,15 @@ export default async function handler(req, res) {
 
         // Check agent health endpoints
         try {
-            const healthUrl = `${agent.base_url}/api/quote/health`;
-            const healthRes = await fetch(healthUrl, { 
-                signal: AbortSignal.timeout(5000) 
+            // For options consultation agent (ai-consulting), use the base_url directly (GET request)
+            // For quote agent, use /api/quote/health endpoint
+            const isOptionsAgent = agent.base_url.includes('/api/ai-consulting');
+            const healthUrl = isOptionsAgent ? agent.base_url : `${agent.base_url}/api/quote/health`;
+
+            const healthRes = await fetch(healthUrl, {
+                signal: AbortSignal.timeout(5000)
             });
-            
+
             if (!healthRes.ok) {
                 const errorText = await healthRes.text().catch(() => 'Unknown error');
                 console.error(`❌ Health check failed: ${healthRes.status} ${healthRes.statusText} - ${errorText}`);
@@ -113,19 +117,25 @@ export default async function handler(req, res) {
                 newApiStatus = 'error';
             } else {
                 // Verify API endpoint
-                const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
-                const verifyRes = await fetch(verifyUrl, { 
-                    method: 'POST', 
-                    signal: AbortSignal.timeout(5000) 
-                });
-                
-                if (!verifyRes.ok) {
-                    const errorText = await verifyRes.text().catch(() => 'Unknown error');
-                    console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
-                    newApiStatus = 'error';
+                // For options agent, the GET request itself is the health check
+                if (!isOptionsAgent) {
+                    const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
+                    const verifyRes = await fetch(verifyUrl, {
+                        method: 'POST',
+                        signal: AbortSignal.timeout(5000)
+                    });
+
+                    if (!verifyRes.ok) {
+                        const errorText = await verifyRes.text().catch(() => 'Unknown error');
+                        console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
+                        newApiStatus = 'error';
+                    } else {
+                        const verifyData = await verifyRes.json();
+                        newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    }
                 } else {
-                    const verifyData = await verifyRes.json();
-                    newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    // For options agent, receiving 200 OK from GET is enough
+                    newApiStatus = 'healthy';
                 }
             }
         } catch (err) {
@@ -155,10 +165,10 @@ export default async function handler(req, res) {
         if (newApiStatus === 'healthy' && agent.base_url) {
             try {
                 // Call the stats endpoint internally to send heartbeat
-                const statsApiUrl = process.env.VERCEL_URL 
+                const statsApiUrl = process.env.VERCEL_URL
                     ? `https://${process.env.VERCEL_URL}/api/stats`
                     : 'http://localhost:5001/api/stats';
-                
+
                 const heartbeatResponse = await fetch(statsApiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
