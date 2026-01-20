@@ -295,17 +295,24 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
                 if (hbError) {
                     console.error(`❌ Heartbeat update error:`, hbError.message);
+                } else {
+                    console.log(`✅ Heartbeat agent update success for ${agentId}`);
                 }
 
                 // Log heartbeat activity (Moved out of else block to ensure it logs even if update fails)
-                const { data: agentInfo } = await supabase
+                console.log(`📝 Preparing to insert heartbeat log for ${agentId}...`);
+                const { data: agentInfo, error: agentInfoError } = await supabase
                     .from('agents')
                     .select('name, client_name, client_id')
                     .eq('id', agentId)
                     .single();
 
+                if (agentInfoError) {
+                    console.warn(`⚠️ Could not fetch agent info for logging (using defaults):`, agentInfoError.message);
+                }
+
                 const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
-                await supabase
+                const { error: logError } = await supabase
                     .from('activity_logs')
                     .insert({
                         agent_id: agentId,
@@ -315,8 +322,14 @@ app.post('/api/stats/check-manual', async (req, res) => {
                         timestamp: nowIso,
                         response_time: 0
                     });
+
+                if (logError) {
+                    console.error(`❌ Log insertion failed:`, logError.message);
+                } else {
+                    console.log(`✅ Heartbeat log inserted successfully for ${agentId}`);
+                }
             } catch (hbError) {
-                console.error(`⚠️ Failed to send heartbeat:`, hbError.message);
+                console.error(`⚠️ Failed to send heartbeat logic:`, hbError.message);
             }
         }
 

@@ -162,35 +162,61 @@ export default async function handler(req, res) {
 
         // Send heartbeat via /api/stats endpoint (same as agent's heartbeat)
         // This ensures proper activity logging and updates
+        // Send heartbeat via direct DB operations (bypass self-fetch to avoid Vercel auth issues)
         if (newApiStatus === 'healthy' && agent.base_url) {
             try {
-                // Call the stats endpoint internally to send heartbeat
-                const statsApiUrl = process.env.VERCEL_URL
-                    ? `https://${process.env.VERCEL_URL}/api/stats`
-                    : 'http://localhost:5001/api/stats';
-
-                const heartbeatResponse = await fetch(statsApiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        agentId: agentId,
-                        apiType: 'heartbeat',
-                        baseUrl: agent.base_url,
+                // 1. Update Agent Status (Redundant confirmation)
+                const { error: hbError } = await supabase
+                    .from('agents')
+                    .update({
+                        last_active: nowIso,
                         model: agent.model || 'gemini-3-pro-image-preview',
-                        account: agent.account || 'admin@worldlocker.com',
-                        apiKey: agent.api_key || 'sk-unknown',
-                        shouldCountApi: false,
-                        shouldCountTask: false,
-                        responseTime: 0
+                        base_url: agent.base_url,
+                        status: 'online'
                     })
-                });
+                    .eq('id', agentId);
 
-                if (!heartbeatResponse.ok) {
-                    const errorText = await heartbeatResponse.text().catch(() => 'Unknown error');
-                    console.error(`⚠️ Failed to send heartbeat: ${heartbeatResponse.status} - ${errorText}`);
+                if (hbError) {
+                    console.error(`❌ Heartbeat update error:`, hbError.message);
+                } else {
+                    console.log(`✅ Heartbeat agent update success for ${agentId}`);
                 }
+
+                // 2. Log Heartbeat Activity (Independent of update success)
+                console.log(`📝 Preparing to insert heartbeat log for ${agentId}...`);
+
+                // Fetch latest name/client info just in case
+                const { data: agentInfo, error: agentInfoError } = await supabase
+                    .from('agents')
+                    .select('name, client_name, client_id')
+                    .eq('id', agentId)
+                    .single();
+
+                if (agentInfoError) {
+                    console.warn(`⚠️ Could not fetch agent info for logging (using defaults):`, agentInfoError.message);
+                }
+
+                const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
+
+                const { error: logError } = await supabase
+                    .from('activity_logs')
+                    .insert({
+                        agent_id: agentId,
+                        action: `Heartbeat - ${agentName} (via status check)`,
+                        type: 'heartbeat',
+                        status: 'success',
+                        timestamp: nowIso,
+                        response_time: 0
+                    });
+
+                if (logError) {
+                    console.error(`❌ Log insertion failed:`, logError.message);
+                } else {
+                    console.log(`✅ Heartbeat log inserted successfully for ${agentId}`);
+                }
+
             } catch (hbError) {
-                console.error(`⚠️ Failed to send heartbeat:`, hbError.message);
+                console.error(`⚠️ Failed to send heartbeat logic:`, hbError.message);
             }
         }
 
