@@ -295,26 +295,26 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
                 if (hbError) {
                     console.error(`❌ Heartbeat update error:`, hbError.message);
-                } else {
-                    // Log heartbeat activity
-                    const { data: agentInfo } = await supabase
-                        .from('agents')
-                        .select('name, client_name, client_id')
-                        .eq('id', agentId)
-                        .single();
-
-                    const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
-                    await supabase
-                        .from('activity_logs')
-                        .insert({
-                            agent_id: agentId,
-                            action: `Heartbeat - ${agentName} (via status check)`,
-                            type: 'heartbeat',
-                            status: 'success',
-                            timestamp: nowIso,
-                            response_time: 0
-                        });
                 }
+
+                // Log heartbeat activity (Moved out of else block to ensure it logs even if update fails)
+                const { data: agentInfo } = await supabase
+                    .from('agents')
+                    .select('name, client_name, client_id')
+                    .eq('id', agentId)
+                    .single();
+
+                const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
+                await supabase
+                    .from('activity_logs')
+                    .insert({
+                        agent_id: agentId,
+                        action: `Heartbeat - ${agentName} (via status check)`,
+                        type: 'heartbeat',
+                        status: 'success',
+                        timestamp: nowIso,
+                        response_time: 0
+                    });
             } catch (hbError) {
                 console.error(`⚠️ Failed to send heartbeat:`, hbError.message);
             }
