@@ -124,7 +124,7 @@ export function DashboardPage() {
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-semibold text-slate-900">
                                         {log.agent}
-                                        {log.userName && !log.action?.includes('User login') && (
+                                        {log.userName && (
                                             <span style={{ color: '#94a3b8', fontWeight: 'normal', marginLeft: '6px' }}>
                                                 - {log.userName}
                                             </span>
