@@ -112,6 +112,17 @@ app.post('/api/stats', async (req, res) => {
             if (rpcError) console.error(`❌ RPC Stats Error [${agentId}]:`, rpcError.message);
         }
 
+        // Update model and last active for non-heartbeat requests if model is provided
+        if (model && apiType !== 'heartbeat') {
+            await supabase
+                .from('agents')
+                .update({
+                    model: model,
+                    last_active: new Date().toISOString()
+                })
+                .eq('id', agentId);
+        }
+
         // 4. Handle Activity Log
         if (actionToLog) {
             const { error: logError } = await supabase
@@ -192,7 +203,21 @@ app.post('/api/stats/check-manual', async (req, res) => {
         }
 
         try {
-            const healthUrl = `${agent.base_url}/api/quote/health`;
+            // For options consultation agent (ai-consulting), use the base_url directly (GET request)
+            // For quote agent, use /api/quote/health endpoint
+            const isOptionsAgent = agent.base_url.includes('/api/ai-consulting');
+
+            // In development, use localhost instead of production URL
+            const isDev = process.env.NODE_ENV !== 'production';
+            let baseUrlToCheck = agent.base_url;
+
+            if (isDev && baseUrlToCheck.includes('mansumetal.com')) {
+                baseUrlToCheck = baseUrlToCheck.replace('https://mansumetal.com', 'http://localhost:3000');
+                console.log(`🔧 Dev mode: Using localhost URL: ${baseUrlToCheck}`);
+            }
+
+            const healthUrl = isOptionsAgent ? baseUrlToCheck : `${baseUrlToCheck}/api/quote/health`;
+
             const healthRes = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
 
             if (!healthRes.ok) {
@@ -201,17 +226,20 @@ app.post('/api/stats/check-manual', async (req, res) => {
                 newStatus = 'offline';
                 newApiStatus = 'error';
             } else {
-                // Verify API endpoint
-                const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
-                const verifyRes = await fetch(verifyUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
+                // For options agent, the GET request itself is the health check
+                // For quote agent, verify API endpoint
+                if (!isOptionsAgent) {
+                    const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
+                    const verifyRes = await fetch(verifyUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
 
-                if (!verifyRes.ok) {
-                    const errorText = await verifyRes.text().catch(() => 'Unknown error');
-                    console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
-                    newApiStatus = 'error';
-                } else {
-                    const verifyData = await verifyRes.json();
-                    newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    if (!verifyRes.ok) {
+                        const errorText = await verifyRes.text().catch(() => 'Unknown error');
+                        console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
+                        newApiStatus = 'error';
+                    } else {
+                        const verifyData = await verifyRes.json();
+                        newApiStatus = verifyData.success ? 'healthy' : 'error';
+                    }
                 }
             }
         } catch (err) {

@@ -408,7 +408,8 @@
     font-weight: 700;
     color: #0f172a;
     line-height: 1;
-    letter-spacing: 0.02em; /* 숫자 간 간격 증가 */
+    letter-spacing: 0.02em;
+    /* 숫자 간 간격 증가 */
     margin-top: 4px;
 }
 
@@ -1572,8 +1573,102 @@
         opacity: 0;
         transform: translateY(-8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ============================================
+   Sorting & Classification Controls
+   ============================================ */
+
+.controls-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-md);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.filter-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.select-custom {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.select-custom:hover {
+    border-color: var(--color-primary-light);
+}
+
+.select-custom:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-50);
+}
+
+
+.agent-card__drag-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    cursor: grab;
+    background: transparent;
+    border: none;
+    transition: all var(--transition-fast);
+}
+
+.agent-card__drag-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 14px 14px 0 0;
+    border-color: var(--color-border) transparent transparent transparent;
+    transition: all var(--transition-fast);
+}
+
+.agent-card__drag-handle:hover::before {
+    border-color: var(--color-primary-light) transparent transparent transparent;
+    border-width: 18px 18px 0 0;
+}
+
+.agent-card__drag-handle:active {
+    cursor: grabbing;
+}
+
+.sortable-card-wrapper {
+    touch-action: none;
 }

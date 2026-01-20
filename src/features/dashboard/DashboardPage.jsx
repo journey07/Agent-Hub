@@ -123,7 +123,19 @@ export function DashboardPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-semibold text-slate-900">
-                                        {log.agent}
+                                        {log.clientName && (
+                                            <span style={{ color: '#0f172a', fontWeight: 'bold', marginRight: '4px' }}>
+                                                {log.clientName}
+                                            </span>
+                                        )}
+                                        {log.clientName && (
+                                            <span style={{ color: '#94a3b8', fontWeight: 'normal', marginRight: '4px' }}>
+                                                ·
+                                            </span>
+                                        )}
+                                        <span style={{ color: '#475569', fontWeight: '500' }}>
+                                            {log.agent}
+                                        </span>
                                         {log.userName && (
                                             <span style={{ color: '#94a3b8', fontWeight: 'normal', marginLeft: '6px' }}>
                                                 - {log.userName}

@@ -52,7 +52,7 @@ export function AgentDetailPage() {
         return false;
     });
     // Auto-scroll logic removed as logs are ordered newest-first (top)
-    
+
     // Detect mobile screen size changes
     useEffect(() => {
         const checkMobile = () => {
@@ -92,7 +92,7 @@ export function AgentDetailPage() {
         if (chartTimeRange === 'today') {
             // Hourly - Today (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
             const todayKorea = getTodayInKoreaString();
-            
+
             // hourlyStats를 맵으로 변환하여 빠른 조회 (오늘 날짜만)
             const statsMap = new Map();
             if (agent.hourlyStats && Array.isArray(agent.hourlyStats)) {
@@ -101,7 +101,7 @@ export function AgentDetailPage() {
                     if (stat.updated_at && stat.updated_at !== todayKorea) {
                         return;
                     }
-                    
+
                     const hour = stat.hour || stat.hour_key || stat.h;
                     if (hour !== undefined && hour !== null) {
                         const hourStr = String(hour).padStart(2, '0');
@@ -133,7 +133,7 @@ export function AgentDetailPage() {
             // Use Korean timezone (24시 기준 = 자정 00:00)
             const todayStr = getTodayInKoreaString();
             const today = getTodayInKorea();
-            
+
             // 날짜 범위 계산: week는 최근 7일, month는 최근 30일
             const days = chartTimeRange === 'week' ? 7 : 30;
             const startDate = new Date(today);
@@ -278,6 +278,18 @@ export function AgentDetailPage() {
                     <path d="M12 12L20 8" stroke={`url(#${gradId})`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M12 12L4 8" stroke={`url(#${gradId})`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
+            ),
+            bell: (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor={grad[0]} />
+                            <stop offset="100%" stopColor={grad[1]} />
+                        </linearGradient>
+                    </defs>
+                    <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke={`url(#${gradId})`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6981 21.5547 10.4458 21.3031 10.27 21" stroke={`url(#${gradId})`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
             )
         };
         return icons[type] || icons.tasks;
@@ -296,7 +308,7 @@ export function AgentDetailPage() {
             // Use Korean timezone (24시 기준 = 자정 00:00)
             const todayStr = getTodayInKoreaString();
             const today = getTodayInKorea();
-            
+
             // 날짜 범위 계산: 오늘 포함하여 최근 days일
             // 예: week (7일) = 오늘 + 과거 6일 = 총 7일
             const startDate = new Date(today);
@@ -313,12 +325,12 @@ export function AgentDetailPage() {
                     // 날짜 범위 내이고 오늘 날짜가 아닌 것만 포함
                     return date >= startDate && d.date !== todayStr;
                 });
-            
+
             // breakdown 데이터를 정규화하여 일관된 구조로 변환
             const historyWithoutToday = filteredByDate
                 .map(d => {
                     let breakdown = d.breakdown;
-                    
+
                     // breakdown이 문자열인 경우 (JSONB가 문자열로 파싱된 경우)
                     if (typeof breakdown === 'string') {
                         try {
@@ -327,16 +339,16 @@ export function AgentDetailPage() {
                             breakdown = {};
                         }
                     }
-                    
+
                     // breakdown이 null이거나 undefined인 경우 빈 객체로 처리
                     if (!breakdown || typeof breakdown !== 'object') {
                         breakdown = {};
                     }
-                    
+
                     return breakdown;
                 })
-                // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
-                // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
+            // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
+            // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
             // 오늘 데이터를 포함하여 총 days일의 데이터 구성
             // agent.apiBreakdown은 {api_type: {today, total}} 구조
@@ -367,14 +379,43 @@ export function AgentDetailPage() {
             }, 0);
         };
 
+        // Agent-specific task definitions
+        if (agent.id === 'agent-mansumetal-001') {
+            const openCount = sum(['open-consulting']);
+            const openTotal = agent.apiBreakdown['open-consulting']?.total || 0;
+
+            const aiCount = sum(['ai-consulting']);
+            const aiTotal = agent.apiBreakdown['ai-consulting']?.total || 0;
+
+            return [
+                {
+                    id: 'open',
+                    name: '옵션 선택 도우미 호출',
+                    period: openCount,
+                    total: openTotal,
+                    icon: <PremiumIcon type="bell" color="blue" size={20} />,
+                    color: '#3b82f6'
+                },
+                {
+                    id: 'ai',
+                    name: 'AI 도우미 답변 완료',
+                    period: aiCount,
+                    total: aiTotal,
+                    icon: <PremiumIcon type="zap" color="amber" size={20} />,
+                    color: '#f59e0b'
+                }
+            ];
+        }
+
+        // Default: Quotation Agent tasks (agent-worldlocker-001)
         const quoteCount = sum(['calculate']);
-        const quoteTotal = (agent.apiBreakdown['calculate']?.total || 0);
+        const quoteTotal = agent.apiBreakdown['calculate']?.total || 0;
 
         const threeDCount = sum(['generate-3d-installation']);
         const threeDTotal = agent.apiBreakdown['generate-3d-installation']?.total || 0;
 
-        const excelCount = sum(['excel']);
-        const excelTotal = agent.apiBreakdown['excel']?.total || 0;
+        const excelCount = sum(['excel', 'pdf']);
+        const excelTotal = (agent.apiBreakdown['excel']?.total || 0) + (agent.apiBreakdown['pdf']?.total || 0);
 
         return [
             {
@@ -395,7 +436,7 @@ export function AgentDetailPage() {
             },
             {
                 id: 'excel',
-                name: '견적서 생성(Excel 파일)',
+                name: '견적서 생성(Excel/PDF 파일)',
                 period: excelCount,
                 total: excelTotal,
                 icon: <PremiumIcon type="pdf" color="#1d853eff" size={20} />,
@@ -469,75 +510,75 @@ export function AgentDetailPage() {
 
             {/* KPI Cards - Hide on mobile when Activity Feed is active */}
             {!(isMobile && activeTab === 'logs') && (
-            <div className="kpi-grid">
-                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
-                        <PremiumIcon type="tasks" color="blue" size={36} />
-                    </div>
-                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
-                        <div className="kpi-label">Today Tasks</div>
-                        <div className="kpi-value">
-                            <AnimatedNumber value={agent.todayTasks || 0} formatter={formatNumber} />
+                <div className="kpi-grid">
+                    <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                            <PremiumIcon type="tasks" color="blue" size={36} />
                         </div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
-                            Total: {formatNumber(agent.totalTasks || Object.values(agent.apiBreakdown || {}).reduce((acc, v) => acc + (v.total || 0), 0))}
+                        <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                            <div className="kpi-label">Today Tasks</div>
+                            <div className="kpi-value">
+                                <AnimatedNumber value={agent.todayTasks || 0} formatter={formatNumber} />
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                                Total: {formatNumber(agent.totalTasks || Object.values(agent.apiBreakdown || {}).reduce((acc, v) => acc + (v.total || 0), 0))}
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
-                        <PremiumIcon type="api" color="rose" size={36} />
-                    </div>
-                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
-                        <div className="kpi-label">Today API Calls</div>
-                        <div className="kpi-value">
-                            <AnimatedNumber value={agent.todayApiCalls || 0} formatter={formatNumber} />
+                    <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                            <PremiumIcon type="api" color="rose" size={36} />
                         </div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
-                            Total: {formatNumber(agent.totalApiCalls)}
+                        <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                            <div className="kpi-label">Today API Calls</div>
+                            <div className="kpi-value">
+                                <AnimatedNumber value={agent.todayApiCalls || 0} formatter={formatNumber} />
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                                Total: {formatNumber(agent.totalApiCalls)}
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
-                        <PremiumIcon type="latency" color="amber" size={36} />
-                    </div>
-                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
-                        <div className="kpi-label">Avg Latency</div>
-                        <div className="kpi-value" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
-                            <AnimatedNumber value={agent.avgResponseTime || 0} />
-                            <span style={{ fontSize: '1rem', fontWeight: 600, marginLeft: '0.25rem' }}>ms</span>
+                    <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                            <PremiumIcon type="latency" color="amber" size={36} />
                         </div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
-                            Real-time stats
+                        <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                            <div className="kpi-label">Avg Latency</div>
+                            <div className="kpi-value" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end' }}>
+                                <AnimatedNumber value={agent.avgResponseTime || 0} />
+                                <span style={{ fontSize: '1rem', fontWeight: 600, marginLeft: '0.25rem' }}>ms</span>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                                Real-time stats
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
-                        <PremiumIcon type="success" color="emerald" size={36} />
-                    </div>
-                    <div style={{ textAlign: 'right', paddingRight: '12px' }}>
-                        <div className="kpi-label">Success Rate</div>
-                        <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
-                            {agent.apiStatus === 'error' ? (
-                                '0.0%'
-                            ) : (
-                                <AnimatedNumber 
-                                    value={((1 - (agent.errorRate || 0)) * 100)} 
-                                    formatter={(val) => `${val.toFixed(1)}%`}
-                                />
-                            )}
+                    <div className="kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="kpi-icon-premium" style={{ marginBottom: 0, width: '72px', height: '72px' }}>
+                            <PremiumIcon type="success" color="emerald" size={36} />
                         </div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
-                            {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}
+                        <div style={{ textAlign: 'right', paddingRight: '12px' }}>
+                            <div className="kpi-label">Success Rate</div>
+                            <div className={`kpi-value ${agent.apiStatus === 'error' ? 'text-slate-400' : ''}`}>
+                                {agent.apiStatus === 'error' ? (
+                                    '0.0%'
+                                ) : (
+                                    <AnimatedNumber
+                                        value={((1 - (agent.errorRate || 0)) * 100)}
+                                        formatter={(val) => `${val.toFixed(1)}%`}
+                                    />
+                                )}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginTop: '8px' }}>
+                                {agent.apiStatus === 'error' ? 'Connection Failed' : 'System Healthy'}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             )}
 
             {activeTab === 'overview' ? (
@@ -720,7 +761,7 @@ export function AgentDetailPage() {
                                         const minutes = String(date.getMinutes()).padStart(2, '0');
                                         return `${hours}:${minutes}`;
                                     };
-                                    
+
                                     return (
                                         <div key={log.id || idx} className="recent-log-item">
                                             <span className="log-ts">
@@ -775,19 +816,23 @@ export function AgentDetailPage() {
                                 <span className="info-label">Account Info</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
                                     <Key size={18} style={{ color: '#0ea5e9' }} />
-                                    <a 
-                                        href="https://aistudio.google.com/usage?timeRange=last-28-days&project=gen-lang-client-0280231890"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="info-value"
-                                        style={{ 
-                                            color: 'inherit',
-                                            textDecoration: 'none',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Google AI Studio - worldlocker.ax
-                                    </a>
+                                    {agent.id === 'agent-mansumetal-001' ? (
+                                        <span className="info-value">OpenAI - injeon07</span>
+                                    ) : (
+                                        <a
+                                            href="https://aistudio.google.com/usage?timeRange=last-28-days&project=gen-lang-client-0280231890"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="info-value"
+                                            style={{
+                                                color: 'inherit',
+                                                textDecoration: 'none',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Google AI Studio - worldlocker.ax
+                                        </a>
+                                    )}
                                 </div>
                             </div>
                         </div>

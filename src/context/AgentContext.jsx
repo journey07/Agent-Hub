@@ -285,7 +285,8 @@ export function AgentProvider({ children }) {
                             status: payload.new.status || 'success',
                             timestamp: payload.new.timestamp || new Date().toISOString(),
                             responseTime: payload.new.response_time || 0,
-                            userName: payload.new.user_name || null
+                            userName: payload.new.user_name || null,
+                            clientName: agents.find(a => a.id === payload.new.agent_id)?.client_name || ''
                         };
 
                         // Immediately update cache for instant display

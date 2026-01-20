@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, ShieldCheck, Power, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, ShieldCheck, Power, CheckCircle2, GripVertical } from 'lucide-react';
 import { Toggle, AnimatedNumber } from '../../../components/common';
 import { formatNumber, formatRelativeTime } from '../../../utils/formatters';
 
-function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
+function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking, dragHandleProps }) {
     const [resultMessage, setResultMessage] = useState(null);
     const [isError, setIsError] = useState(false);
-    
+
     const handleCheck = async () => {
         if (!agent.isLiveAgent || isChecking) return;
-        
+
         setResultMessage(null);
         setIsError(false);
-        
+
         try {
             const result = await onHealthCheck(agent.id);
             if (result) {
@@ -47,6 +47,14 @@ function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
 
     return (
         <div className={`agent-card agent-card--premium ${agent.status === 'processing' ? 'agent-card--active' : ''} ${getGradientClass()}`}>
+            {dragHandleProps && (
+                <button
+                    className="agent-card__drag-handle"
+                    {...dragHandleProps}
+                    title="Drag to reorder"
+                />
+            )}
+
             {/* Header Section */}
             <div className="agent-card__header">
                 <div className="agent-card__info-group">
@@ -61,7 +69,7 @@ function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
                     )}
                     <div className="agent-card__text-content">
                         <h3 className="agent-card__name">{agent.name}</h3>
-                        <p className="agent-card__client">{agent.description || '견적서 및 2D & 3D 이미지 생성 에이전트'}</p>
+                        <p className="agent-card__client">{agent.description || 'AI 기반 업무 자동화 및 분석 서비스'}</p>
                     </div>
                 </div>
                 <div className="agent-card__power-control">
@@ -138,7 +146,7 @@ function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
 // Only re-render when relevant props change
 const MemoizedAgentCard = memo(AgentCard, (prevProps, nextProps) => {
     // Compare agent properties that affect rendering
-    const agentChanged = 
+    const agentChanged =
         prevProps.agent.id !== nextProps.agent.id ||
         prevProps.agent.status !== nextProps.agent.status ||
         prevProps.agent.todayTasks !== nextProps.agent.todayTasks ||

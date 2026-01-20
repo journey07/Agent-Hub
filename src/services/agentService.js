@@ -29,22 +29,29 @@ export async function getRecentActivityLogs(limit = 100) {
             .select('id, name, client_name')
             .in('id', agentIds);
 
-        // Create agent name map
+        // Create agent info map
         const agentMap = new Map();
         (agentsData || []).forEach(agent => {
-            agentMap.set(agent.id, agent.name || agent.client_name || agent.id);
+            agentMap.set(agent.id, {
+                name: agent.name || agent.client_name || agent.id,
+                clientName: agent.client_name || ''
+            });
         });
 
         // Map logs with agent names
-        const activityLogs = logRows.map(log => ({
-            ...log,
-            // type이 'log'이거나 'activity'면 status를 더 우선해서 사용 (login 등을 필터링하기 위해)
-            type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
-            responseTime: log.response_time,
-            agentId: log.agent_id,
-            agent: agentMap.get(log.agent_id) || log.agent_id,
-            userName: log.user_name || null
-        }));
+        const activityLogs = logRows.map(log => {
+            const agentInfo = agentMap.get(log.agent_id) || { name: log.agent_id, clientName: '' };
+            return {
+                ...log,
+                // type이 'log'이거나 'activity'면 status를 더 우선해서 사용 (login 등을 필터링하기 위해)
+                type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
+                responseTime: log.response_time,
+                agentId: log.agent_id,
+                agent: agentInfo.name,
+                clientName: agentInfo.clientName,
+                userName: log.user_name || null
+            };
+        });
 
         return { data: activityLogs, error: null };
     } catch (error) {
@@ -141,6 +148,7 @@ export async function getSingleAgent(agentId) {
             responseTime: log.response_time,
             agentId,
             agent: agent.name,
+            clientName: agent.client_name || '',
             userName: log.user_name || null
         }));
 
@@ -339,6 +347,7 @@ export async function getAllAgents() {
                 // type이 'log'이거나 'activity'면 status를 더 우선해서 사용
                 type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
                 agent: agent.name,
+                clientName: agent.client_name || '',
                 userName: log.userName || null
             }));
 
