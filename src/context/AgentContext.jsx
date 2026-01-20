@@ -367,7 +367,8 @@ export function AgentProvider({ children }) {
             }
             supabase.removeChannel(channel);
         };
-    }, [isAuthenticated, session, queueAgentUpdate, invalidateAgents, invalidateLogs]);
+    }, [isAuthenticated, queueAgentUpdate, invalidateAgents, invalidateLogs, addLogOptimistically]);
+    // Note: session removed from dependencies to prevent reconnection on auth state changes
 
     // Toggle agent status (on/off)
     const toggleAgent = useCallback(async (agentId) => {
