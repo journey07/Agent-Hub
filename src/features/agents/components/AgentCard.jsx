@@ -61,7 +61,7 @@ function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking }) {
                     )}
                     <div className="agent-card__text-content">
                         <h3 className="agent-card__name">{agent.name}</h3>
-                        <p className="agent-card__client">{agent.description || '2D & 3D 이미지 및 견적서 생성 에이전트'}</p>
+                        <p className="agent-card__client">{agent.description || '견적서 및 2D & 3D 이미지 생성 에이전트'}</p>
                     </div>
                 </div>
                 <div className="agent-card__power-control">

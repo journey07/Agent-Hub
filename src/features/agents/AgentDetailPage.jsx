@@ -130,10 +130,30 @@ export function AgentDetailPage() {
             if (!agent) return [];
             const history = agent.dailyHistory || [];
 
-            // Filter out existing "Today" entry from history if it exists to avoid duplication
             // Use Korean timezone (24시 기준 = 자정 00:00)
             const todayStr = getTodayInKoreaString();
-            const historyWithoutToday = history.filter(d => d.date !== todayStr);
+            const today = getTodayInKorea();
+            
+            // 날짜 범위 계산: week는 최근 7일, month는 최근 30일
+            const days = chartTimeRange === 'week' ? 7 : 30;
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - (days - 1));
+            startDate.setHours(0, 0, 0, 0);
+
+            // 날짜 범위 내의 데이터만 필터링하고 정렬
+            const historyWithoutToday = history
+                .filter(d => {
+                    if (!d.date || d.date === todayStr) return false;
+                    const date = new Date(d.date + 'T00:00:00');
+                    date.setHours(0, 0, 0, 0);
+                    return date >= startDate;
+                })
+                .sort((a, b) => {
+                    // 날짜 기준 오름차순 정렬 (과거 → 현재)
+                    const dateA = a.date ? new Date(a.date + 'T00:00:00') : new Date(0);
+                    const dateB = b.date ? new Date(b.date + 'T00:00:00') : new Date(0);
+                    return dateA.getTime() - dateB.getTime();
+                });
 
             const todayStats = {
                 date: 'Today',
@@ -143,7 +163,6 @@ export function AgentDetailPage() {
 
             const combined = [...historyWithoutToday, todayStats];
 
-            // Should probably fill in missing days for 'Week' but history is sufficient for now
             return combined.map(d => ({
                 name: d.date === 'Today' ? 'Today' : d.date.replace(/^\d{4}-/, ''), // Remove year for cleaner x-axis
                 Tasks: Number(d.tasks || 0),
@@ -278,10 +297,10 @@ export function AgentDetailPage() {
             const todayStr = getTodayInKoreaString();
             const today = getTodayInKorea();
             
-            // 날짜 범위 계산: 오늘부터 (days - 1)일 전까지
+            // 날짜 범위 계산: 오늘 포함하여 최근 days일
+            // 예: week (7일) = 오늘 + 과거 6일 = 총 7일
             const startDate = new Date(today);
             startDate.setDate(startDate.getDate() - (days - 1));
-            // 시간을 00:00:00으로 설정하여 날짜 비교 정확도 향상
             startDate.setHours(0, 0, 0, 0);
 
             // dailyHistory에서 날짜 범위 내의 데이터만 필터링 (오늘 제외)
@@ -290,16 +309,14 @@ export function AgentDetailPage() {
                     if (!d.date) return false;
                     // 날짜 문자열을 Date 객체로 변환 (YYYY-MM-DD 형식)
                     const date = new Date(d.date + 'T00:00:00');
-                    // 시간을 00:00:00으로 설정하여 날짜 비교 정확도 향상
                     date.setHours(0, 0, 0, 0);
                     // 날짜 범위 내이고 오늘 날짜가 아닌 것만 포함
-                    const inRange = date >= startDate && d.date !== todayStr;
-                    return inRange;
+                    return date >= startDate && d.date !== todayStr;
                 });
             
+            // breakdown 데이터를 정규화하여 일관된 구조로 변환
             const historyWithoutToday = filteredByDate
                 .map(d => {
-                    // breakdown이 비어있지 않은지 확인
                     let breakdown = d.breakdown;
                     
                     // breakdown이 문자열인 경우 (JSONB가 문자열로 파싱된 경우)
@@ -311,21 +328,19 @@ export function AgentDetailPage() {
                         }
                     }
                     
-                    // breakdown이 null이거나 undefined인 경우
+                    // breakdown이 null이거나 undefined인 경우 빈 객체로 처리
                     if (!breakdown || typeof breakdown !== 'object') {
                         breakdown = {};
                     }
                     
-                    // breakdown이 객체이고 키가 있는지 확인
-                    if (Object.keys(breakdown).length > 0) {
-                        return breakdown;
-                    }
-                    return {};
+                    return breakdown;
                 })
-                .filter(b => Object.keys(b).length > 0); // 빈 breakdown 제거
+                // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
+                // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
-            // 오늘 데이터를 맨 앞에 추가 (가장 최신)
-            // breakdown이 비어있어도 최소한 오늘 데이터는 보여줌
+            // 오늘 데이터를 포함하여 총 days일의 데이터 구성
+            // agent.apiBreakdown은 {api_type: {today, total}} 구조
+            // historyWithoutToday는 {api_type: number} 구조
             currentPeriodData = [agent.apiBreakdown, ...historyWithoutToday];
         }
 
@@ -368,8 +383,7 @@ export function AgentDetailPage() {
                 period: quoteCount,
                 total: quoteTotal,
                 icon: <PremiumIcon type="tasks" color="#f6a53bff" size={20} />,
-                color: '#f6a53bff',
-                label: chartTimeRange === 'today' ? 'Today' : chartTimeRange === 'week' ? 'Past 7 Days' : 'Past 30 Days'
+                color: '#f6a53bff'
             },
             {
                 id: '3d',
@@ -377,8 +391,7 @@ export function AgentDetailPage() {
                 period: threeDCount,
                 total: threeDTotal,
                 icon: <PremiumIcon type="cube" color="#293ec5ff" size={20} />,
-                color: '#293ec5ff',
-                label: chartTimeRange === 'today' ? 'Today' : chartTimeRange === 'week' ? 'Past 7 Days' : 'Past 30 Days'
+                color: '#293ec5ff'
             },
             {
                 id: 'excel',
@@ -386,8 +399,7 @@ export function AgentDetailPage() {
                 period: excelCount,
                 total: excelTotal,
                 icon: <PremiumIcon type="pdf" color="#1d853eff" size={20} />,
-                color: '#1d853eff',
-                label: chartTimeRange === 'today' ? 'Today' : chartTimeRange === 'week' ? 'Past 7 Days' : 'Past 30 Days'
+                color: '#1d853eff'
             }
         ];
     }, [agent, chartTimeRange]);
