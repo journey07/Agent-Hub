@@ -1,273 +1,42 @@
-# 로그가 안 남을 때 디버깅 가이드
+# Troubleshooting: Database Storage Failure
 
-## 🔍 문제 진단 체크리스트
+데이터가 DB에 저장되지 않을 때 체크해야 할 주요 포인트들입니다.
 
-### 1. Supabase 데이터베이스 확인
-
-**activity_logs 테이블에 user_name 컬럼이 있는지 확인:**
-
-```sql
--- Supabase SQL Editor에서 실행
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'activity_logs'
-ORDER BY ordinal_position;
-```
-
-**user_name 컬럼이 없다면 추가:**
-
-```sql
-ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
-```
-
-### 2. 환경 변수 확인
-
-**world_quotation 프로젝트의 환경 변수 확인:**
+## 1. 서버 실행 여부 확인
+현재 시스템에서 `node_modules`를 삭제 중이거나 재설치 중이라면 **Brain Server (`server.js`)**가 중지되어 있을 가능성이 큽니다. 서버가 실행 중인지 먼저 확인하세요.
 
 ```bash
-# 로컬 개발 환경
-cd world_quotation/backend
-cat .env | grep DASHBOARD_API_URL
-
-# 또는
-echo $DASHBOARD_API_URL
+ps aux | grep server.js
 ```
 
-**설정되어 있지 않다면:**
+## 2. Supabase 설정 및 권한 문제 (가장 유력)
+`.env.local` 파일을 확인한 결과, **`SUPABASE_SERVICE_ROLE_KEY`**가 누락되어 있습니다.
 
-```bash
-# 로컬 개발
-DASHBOARD_API_URL=http://localhost:5001/api/stats
+> [!IMPORTANT]
+> 현재 시스템은 `SUPABASE_ANON_KEY`와 시스템 계정 로그인(`steve@dashboard.local`)을 통한 우회 방식을 사용하고 있습니다. 이 방식은 세션 만료나 권한 설정 오류에 취약합니다.
 
-# 프로덕션 (Vercel)
-DASHBOARD_API_URL=https://your-dashboard.vercel.app/api/stats
-```
+**해결 방법:**
+1. Supabase 대시보드 (Settings -> API)에서 `service_role` 세크리트 키를 가져옵니다.
+2. `.env.local`에 `SUPABASE_SERVICE_ROLE_KEY=your_key_here`를 추가합니다.
+3. 이렇게 하면 RLS(Row Level Security)를 우회하여 백엔드에서 안정적으로 DB에 접근할 수 있습니다.
 
-### 3. 사용자 데이터 확인
+## 3. 에이전트 설정 확인 (world_quotation)
+에이전트가 올바른 주소로 신호를 보내고 있는지 확인해야 합니다.
 
-**users 테이블에 name 컬럼 값이 있는지 확인:**
+- 에이전트의 `.env` 파일 내 `DASHBOARD_API_URL`이 `http://localhost:5001/api/stats` (또는 실제 서버 주소)로 정확히 설정되어 있는지 확인하세요.
+- 에이전트 서버가 시작될 때 로그에 `✅ Dashboard stats initialized` 또는 `✅ Heartbeat sent to Dashboard` 메시지가 뜨는지 확인하세요.
 
-```sql
-SELECT id, username, name FROM users;
-```
+## 4. 에이전트 ID 일치 여부
+DB의 `agents` 테이블에 등록된 `id`와 에이전트가 보내는 `agentId`가 일치해야 합니다.
+- 현재 DB에는 `agent-worldlocker-001` (견적 에이전트)이 등록되어 있습니다. 에이전트 소스 코드에서 이 ID를 사용하고 있는지 확인하세요.
 
-**name이 없다면 업데이트:**
+## 5. JWT 세션 만료
+현재 방식(Anon Key + Login)을 사용할 경우, 서버가 장시간 켜져 있으면 로그인이 만료되어 `401 Unauthorized` 에러가 발생할 수 있습니다. `SUPABASE_SERVICE_ROLE_KEY`를 사용하면 이 문제를 근본적으로 해결할 수 있습니다.
 
-```sql
-UPDATE users SET name = '사용자명' WHERE username = '사용자아이디';
-```
+---
 
-### 4. 로그 확인 방법
-
-#### world_quotation 백엔드 로그 확인:
-
-```bash
-# 로컬 개발 시
-cd world_quotation/backend
-npm start
-
-# 다음 로그들이 보여야 함:
-# - 🔐 Login successful for user: ...
-# - 📤 Sending login log to Dashboard...
-# - ✅ Activity log sent successfully: ...
-# - 📤 Sending API call to Dashboard: ...
-# - ✅ Stats reported to Brain: ...
-```
-
-#### Dashboard API 로그 확인:
-
-```bash
-# 로컬 개발 시
-cd Dashboard
-npm run dev
-
-# 다음 로그들이 보여야 함:
-# - 📥 Incoming API Call: ... [User: ...]
-# - 📝 Inserting log to activity_logs: ...
-# - ✅ Logged successfully: ...
-```
-
-#### Vercel 배포 환경:
-
-1. Vercel Dashboard > 프로젝트 > Functions 탭
-2. `/api/stats` 함수 클릭
-3. Logs 탭에서 실시간 로그 확인
-
-### 5. 네트워크 확인
-
-**Dashboard API가 접근 가능한지 확인:**
-
-```bash
-# 로컬
-curl http://localhost:5001/api/stats \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "agent-worldlocker-001",
-    "apiType": "activity_log",
-    "logAction": "Test log",
-    "userName": "Test User"
-  }'
-
-# 프로덕션
-curl https://your-dashboard.vercel.app/api/stats \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "agent-worldlocker-001",
-    "apiType": "activity_log",
-    "logAction": "Test log",
-    "userName": "Test User"
-  }'
-```
-
-### 6. 브라우저 콘솔 확인
-
-**프론트엔드에서 헤더가 제대로 전송되는지 확인:**
-
-1. 브라우저 개발자 도구 열기 (F12)
-2. Network 탭 열기
-3. API 요청 클릭
-4. Headers 섹션에서 `X-User-Name` 헤더 확인
-5. Console 탭에서 다음 로그 확인:
-   - `📤 Sending request with user name: ...`
-
-### 7. Supabase에서 직접 확인
-
-**activity_logs 테이블에서 최신 로그 확인:**
-
-```sql
-SELECT 
-  id,
-  agent_id,
-  action,
-  type,
-  status,
-  user_name,
-  timestamp
-FROM activity_logs
-ORDER BY timestamp DESC
-LIMIT 20;
-```
-
-**user_name이 null인 경우:**
-- 사용자 정보가 제대로 전달되지 않았을 수 있음
-- 로그 확인 필요
-
-## 🐛 일반적인 문제와 해결책
-
-### 문제 1: "user_name 컬럼이 없다" 에러
-
-**해결:**
-```sql
-ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
-```
-
-### 문제 2: "DASHBOARD_API_URL이 설정되지 않음"
-
-**해결:**
-- 환경 변수에 `DASHBOARD_API_URL` 추가
-- 서버 재시작
-
-### 문제 3: "사용자명이 null로 저장됨"
-
-**원인:**
-- users 테이블에 name 값이 없음
-- 프론트엔드에서 헤더가 전송되지 않음
-
-**해결:**
-- users 테이블에 name 값 업데이트
-- 브라우저 콘솔에서 헤더 전송 확인
-
-### 문제 4: "로그는 전송되지만 activity_logs에 저장 안 됨"
-
-**원인:**
-- Supabase RLS 정책 문제
-- Supabase 연결 문제
-
-**해결:**
-- Supabase 로그 확인
-- RLS 정책 확인 (service_role은 RLS 우회)
-
-## 📊 테스트 시나리오
-
-### 1. 로그인 테스트
-
-1. world_quotation에 로그인
-2. 백엔드 로그에서 다음 확인:
-   ```
-   🔐 Login successful for user: ...
-   📤 Sending login log to Dashboard...
-   ✅ Activity log sent successfully: ...
-   ```
-3. Dashboard API 로그에서 확인:
-   ```
-   📥 Incoming API Call: ... [User: ...]
-   ✅ Logged successfully: ...
-   ```
-4. Supabase에서 확인:
-   ```sql
-   SELECT * FROM activity_logs 
-   WHERE action LIKE 'User login%' 
-   ORDER BY timestamp DESC LIMIT 1;
-   ```
-
-### 2. API 호출 테스트
-
-1. 견적 계산 버튼 클릭
-2. 브라우저 Network 탭에서 `/calculate` 요청 확인
-3. Headers에서 `X-User-Name` 확인
-4. 백엔드 로그에서 확인:
-   ```
-   👤 User name extracted from header: ...
-   📤 Sending API call to Dashboard: ...
-   ```
-5. Supabase에서 확인:
-   ```sql
-   SELECT * FROM activity_logs 
-   WHERE action LIKE 'Calculated Quote%' 
-   ORDER BY timestamp DESC LIMIT 1;
-   ```
-
-## 🔧 추가 디버깅 명령어
-
-### Supabase 연결 테스트
-
-```sql
--- activity_logs 테이블 구조 확인
-\d activity_logs
-
--- 최근 로그 확인
-SELECT * FROM activity_logs 
-ORDER BY timestamp DESC 
-LIMIT 10;
-
--- user_name이 null이 아닌 로그만 확인
-SELECT * FROM activity_logs 
-WHERE user_name IS NOT NULL
-ORDER BY timestamp DESC;
-```
-
-### 환경 변수 테스트
-
-```javascript
-// world_quotation/backend에서
-console.log('DASHBOARD_API_URL:', process.env.DASHBOARD_API_URL);
-console.log('AGENT_ID:', 'agent-worldlocker-001');
-```
-
-## 📞 문제가 계속되면
-
-다음 정보를 수집하여 확인:
-
-1. **백엔드 로그 전체** (에러 메시지 포함)
-2. **Dashboard API 로그** (Vercel Functions 로그)
-3. **Supabase 쿼리 결과:**
-   ```sql
-   SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 5;
-   ```
-4. **환경 변수 확인:**
-   ```bash
-   echo $DASHBOARD_API_URL
-   ```
-5. **브라우저 Network 탭 스크린샷** (헤더 포함)
+### 체크리스트
+- [ ] `SUPABASE_SERVICE_ROLE_KEY`가 `.env.local`에 있는가?
+- [ ] Brain Server (`server.js`)가 실행 중인가? (5001 포트)
+- [ ] 에이전트 서버가 실행 중이며 신호를 보내고 있는가?
+- [ ] Supabase Auth에 시스템 계정(`steve@dashboard.local`)이 실제로 존재하는가? (Service Role Key 미사용 시)

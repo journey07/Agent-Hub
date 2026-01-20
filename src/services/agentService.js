@@ -36,10 +36,10 @@ export async function getRecentActivityLogs(limit = 100) {
         });
 
         // Map logs with agent names
-        // type 필드가 있으면 사용하고, 없으면 status를 fallback으로 사용
         const activityLogs = logRows.map(log => ({
             ...log,
-            type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
+            // type이 'log'이거나 'activity'면 status를 더 우선해서 사용 (login 등을 필터링하기 위해)
+            type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
             responseTime: log.response_time,
             agentId: log.agent_id,
             agent: agentMap.get(log.agent_id) || log.agent_id,
@@ -104,7 +104,7 @@ export async function getSingleAgent(agentId) {
 
         // Fetch hourly stats (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
         const todayKorea = getTodayInKoreaString();
-        
+
         const { data: hourlyStats } = await supabase
             .from('hourly_stats')
             .select('hour, tasks, api_calls, updated_at')
@@ -136,7 +136,8 @@ export async function getSingleAgent(agentId) {
 
         const activityLogs = (logRows || []).map(log => ({
             ...log,
-            type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
+            // type이 'log'이거나 'activity'면 status를 더 우선해서 사용
+            type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
             responseTime: log.response_time,
             agentId,
             agent: agent.name,
@@ -205,7 +206,7 @@ export async function getAllAgents() {
                 .from('api_breakdown')
                 .select('*')
                 .in('agent_id', agentIds),
-            
+
             // 2. Fetch all daily stats (last 30 days) in one query
             supabase
                 .from('daily_stats')
@@ -213,7 +214,7 @@ export async function getAllAgents() {
                 .in('agent_id', agentIds)
                 .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
                 .order('date', { ascending: false }),
-            
+
             // 3. Fetch all hourly stats (today only) in one query
             supabase
                 .from('hourly_stats')
@@ -221,7 +222,7 @@ export async function getAllAgents() {
                 .in('agent_id', agentIds)
                 .eq('updated_at', todayKorea)
                 .order('hour'),
-            
+
             // 4. Fetch recent activity logs for all agents
             // Note: We'll get last 50 per agent, so we fetch more and filter in memory
             supabase
@@ -283,7 +284,8 @@ export async function getAllAgents() {
                     status: log.status,
                     timestamp: log.timestamp,
                     response_time: log.response_time,
-                    type: log.type || log.status, // type이 있으면 사용, 없으면 status 사용
+                    // type이 'log'이거나 'activity'면 status를 더 우선해서 사용
+                    type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
                     responseTime: log.response_time,
                     agentId: log.agent_id,
                     userName: log.user_name || null
@@ -334,6 +336,8 @@ export async function getAllAgents() {
             // Get activity logs (last 50)
             const activityLogs = (activityLogsMap.get(agentId) || []).map(log => ({
                 ...log,
+                // type이 'log'이거나 'activity'면 status를 더 우선해서 사용
+                type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
                 agent: agent.name,
                 userName: log.userName || null
             }));
@@ -385,7 +389,8 @@ export async function updateAgentStats({
     baseUrl,
     account,
     apiKey,
-    status
+    status,
+    userName
 }) {
     try {
         // Check if agent exists
@@ -444,10 +449,11 @@ export async function updateAgentStats({
                 .insert({
                     agent_id: agentId,
                     action: logAction,
-                    type: 'activity',
-                    status: logType || 'info',
+                    type: logType || 'activity',
+                    status: logType || 'info', // Keep for backward compatibility
                     timestamp: new Date().toISOString(),
-                    response_time: responseTime
+                    response_time: responseTime,
+                    user_name: userName || null
                 });
 
             // Fetch updated agent data
@@ -502,7 +508,7 @@ export async function checkAgentHealth(agentId) {
         // In production, use relative path. In development, use localhost if running server.js
         const isDev = import.meta.env.DEV;
         const brainServerUrl = import.meta.env.VITE_BRAIN_SERVER_URL;
-        
+
         let apiUrl;
         if (brainServerUrl) {
             // Custom Brain Server URL provided
@@ -555,9 +561,9 @@ export async function checkAgentHealth(agentId) {
         }
     } catch (error) {
         console.error('Health check error:', error);
-        return { 
-            success: false, 
-            message: error.message || '상태 체크 실패' 
+        return {
+            success: false,
+            message: error.message || '상태 체크 실패'
         };
     }
 }

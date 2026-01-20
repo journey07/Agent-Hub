@@ -203,25 +203,25 @@ export default async function handler(req, res) {
                 if (finalAction.startsWith('Quote:') && !finalAction.startsWith('Calculated Quote:')) {
                     finalAction = `Calculated ${finalAction}`;
                 }
-                
+
                 const logData = {
                     agent_id: agentId,
                     action: finalAction,
-                    type: apiType === 'activity_log' ? 'log' : apiType,
+                    type: logType || (apiType === 'activity_log' ? 'log' : apiType),
                     status: logType || (isError ? 'error' : 'success'),
                     timestamp: new Date().toISOString(),
                     response_time: responseTime || 0,
                     user_name: userName || null
                 };
-                
+
                 console.log(`📝 [LOGIN LOG] Attempting to insert log:`, JSON.stringify(logData, null, 2));
-                
+
                 try {
                     const { error: logError, data: logDataResult } = await supabase
                         .from('activity_logs')
                         .insert(logData)
                         .select();
-                    
+
                     if (logError) {
                         console.error(`❌ [LOGIN LOG] Failed to insert log [${agentId}]:`, logError);
                         console.error('Failed log data:', JSON.stringify(logData, null, 2));

@@ -43,7 +43,7 @@ app.use(async (req, res, next) => {
 app.post('/api/stats', async (req, res) => {
     try {
         if (!supabase) {
-            return res.status(503).json({ 
+            return res.status(503).json({
                 error: 'Database not initialized',
                 message: 'Supabase client failed to initialize. Please check server logs.'
             });
@@ -61,8 +61,9 @@ app.post('/api/stats', async (req, res) => {
             apiKey,
             status,
             logAction,
-            logMessage, // Added to handle trackApiCall logs
-            logType
+            logMessage,
+            logType,
+            userName
         } = req.body;
 
         const actionToLog = logAction || logMessage;
@@ -118,10 +119,11 @@ app.post('/api/stats', async (req, res) => {
                 .insert({
                     agent_id: agentId,
                     action: actionToLog,
-                    type: apiType === 'activity_log' ? 'log' : apiType,
+                    type: logType || (apiType === 'activity_log' ? 'log' : apiType),
                     status: logType || (isError ? 'error' : 'success'),
                     timestamp: new Date().toISOString(),
-                    response_time: responseTime || 0
+                    response_time: responseTime || 0,
+                    user_name: userName || null
                 });
             if (logError) console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
         }
@@ -143,7 +145,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
     try {
         if (!supabase) {
-            return res.status(503).json({ 
+            return res.status(503).json({
                 error: 'Database not initialized',
                 message: 'Supabase client failed to initialize. Please check server logs.'
             });
@@ -160,13 +162,13 @@ app.post('/api/stats/check-manual', async (req, res) => {
             console.error(`❌ Supabase query error for ${agentId}:`, error);
             // PGRST116 means no rows returned (not found)
             if (error.code === 'PGRST116') {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     error: 'Agent not found',
                     details: `No agent found with id: ${agentId}`,
                     code: error.code
                 });
             }
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Database query failed',
                 details: error.message,
                 code: error.code
@@ -175,7 +177,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
 
         if (!agent) {
             console.error(`❌ Agent ${agentId} query returned null`);
-            return res.status(404).json({ 
+            return res.status(404).json({
                 error: 'Agent not found',
                 details: `Query returned null for id: ${agentId}`
             });
@@ -192,7 +194,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
         try {
             const healthUrl = `${agent.base_url}/api/quote/health`;
             const healthRes = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
-            
+
             if (!healthRes.ok) {
                 const errorText = await healthRes.text().catch(() => 'Unknown error');
                 console.error(`❌ Health check failed: ${healthRes.status} ${healthRes.statusText} - ${errorText}`);
@@ -202,7 +204,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
                 // Verify API endpoint
                 const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
                 const verifyRes = await fetch(verifyUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
-                
+
                 if (!verifyRes.ok) {
                     const errorText = await verifyRes.text().catch(() => 'Unknown error');
                     console.error(`❌ API verify failed: ${verifyRes.status} ${verifyRes.statusText} - ${errorText}`);
@@ -272,7 +274,7 @@ app.post('/api/stats/check-manual', async (req, res) => {
                         .select('name, client_name, client_id')
                         .eq('id', agentId)
                         .single();
-                    
+
                     const agentName = agentInfo?.name || agentInfo?.client_name || agentId;
                     await supabase
                         .from('activity_logs')

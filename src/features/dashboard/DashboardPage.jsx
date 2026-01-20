@@ -9,7 +9,8 @@ import {
     CheckCircleIconClean,
     ClockIconClean,
     InfoIconClean,
-    HeartIconClean
+    HeartIconClean,
+    LockIconClean
 } from '../../components/common/CustomIcons';
 
 // action 텍스트를 기반으로 아이콘 결정
@@ -33,20 +34,23 @@ function getActivityIcon(log) {
     if (log.type === 'log') {
         return <InfoIconClean size={20} />;
     }
-    
+    if (log.type === 'login') {
+        return <LockIconClean size={20} color="#F59E0B" />;
+    }
+
     // action 텍스트 기반 매칭 (type이 없거나 매칭되지 않은 경우)
     const action = (log.action || '').toLowerCase();
-    
+
     // complete, generated, calculated가 포함되면 success
     if (action.includes('completed') || action.includes('generated') || action.includes('calculated')) {
         return <CheckCircleIconClean size={20} />;
     }
-    
+
     // calling으로 시작하면 processing
     if (action.startsWith('calling') || action.includes('calling')) {
         return <ClockIconClean size={20} />;
     }
-    
+
     // 기본값: info
     return <InfoIconClean size={20} />;
 }
