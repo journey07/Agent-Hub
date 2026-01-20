@@ -15,7 +15,7 @@ export function AgentProvider({ children }) {
     // Use React Query hooks for data fetching
     const { data: rawAgents, isLoading: isLoadingAgents, error: agentsError } = useAgentsData();
     const { data: rawActivityLogs, isLoading: isLoadingLogs } = useActivityLogs(100);
-    const { invalidateAll, invalidateAgents, invalidateAgent, invalidateLogs, addLogOptimistically } = useInvalidateAgents();
+    const { invalidateAll, invalidateAgents, invalidateAgent, invalidateLogs, addLogOptimistically, updateAgentStatusInCache } = useInvalidateAgents();
 
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
@@ -23,12 +23,21 @@ export function AgentProvider({ children }) {
     // Combine loading states
     const isLoading = isLoadingAgents || isLoadingLogs;
 
-    // Sort agents (worldlocker first)
+    // Sort agents by last activity (most recent first)
     const agents = useMemo(() => {
         if (!rawAgents || rawAgents.length === 0) return [];
         return [...rawAgents].sort((a, b) => {
+            const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
+            const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
+
+            if (timeB !== timeA) {
+                return timeB - timeA;
+            }
+
+            // Secondary sort by specific ID to keep it somewhat stable if times are equal
             if (a.id === 'agent-worldlocker-001') return -1;
             if (b.id === 'agent-worldlocker-001') return 1;
+
             return 0;
         });
     }, [rawAgents]);
@@ -255,6 +264,13 @@ export function AgentProvider({ children }) {
                 },
                 (payload) => {
                     if (payload.eventType === 'UPDATE' && payload.new?.id) {
+                        // Instant cache update for live sorting
+                        updateAgentStatusInCache(payload.new.id, {
+                            lastActive: payload.new.last_active,
+                            status: payload.new.status,
+                            model: payload.new.model,
+                            baseUrl: payload.new.base_url
+                        });
                         queueAgentUpdate(payload.new.id);
                     } else if (payload.eventType === 'INSERT' && payload.new?.id) {
                         invalidateAgents();
@@ -291,6 +307,13 @@ export function AgentProvider({ children }) {
 
                         // Immediately update cache for instant display
                         addLogOptimistically(newLog);
+
+                        // Optimistically update agent's lastActive timestamp so it jumps to top
+                        if (payload.new.agent_id) {
+                            updateAgentStatusInCache(payload.new.agent_id, {
+                                lastActive: payload.new.timestamp || new Date().toISOString()
+                            });
+                        }
 
                         // Background refetch to get agent name and validate data
                         invalidateLogs();
@@ -368,7 +391,7 @@ export function AgentProvider({ children }) {
             }
             supabase.removeChannel(channel);
         };
-    }, [isAuthenticated, queueAgentUpdate, invalidateAgents, invalidateLogs, addLogOptimistically]);
+    }, [isAuthenticated, queueAgentUpdate, invalidateAgents, invalidateLogs, addLogOptimistically, updateAgentStatusInCache]);
     // Note: session removed from dependencies to prevent reconnection on auth state changes
 
     // Toggle agent status (on/off)

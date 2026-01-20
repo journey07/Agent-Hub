@@ -106,6 +106,26 @@ export function useInvalidateAgents() {
         queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
     }, [queryClient]);
 
+    // Optimistic update for agent status/metadata
+    const updateAgentStatusInCache = useCallback((agentId, updates) => {
+        // Update list cache
+        queryClient.setQueryData(['agents', 'all'], (oldAgents) => {
+            if (!oldAgents) return oldAgents;
+            return oldAgents.map(agent => {
+                if (agent.id === agentId) {
+                    return { ...agent, ...updates };
+                }
+                return agent;
+            });
+        });
+
+        // Update single agent cache if exists
+        queryClient.setQueryData(['agents', agentId], (oldAgent) => {
+            if (!oldAgent) return oldAgent;
+            return { ...oldAgent, ...updates };
+        });
+    }, [queryClient]);
+
     const invalidateLogs = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
     }, [queryClient]);
@@ -125,6 +145,7 @@ export function useInvalidateAgents() {
         invalidateAgent,
         invalidateLogs,
         addLogOptimistically,
+        updateAgentStatusInCache,
     };
 }
 

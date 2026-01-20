@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, ShieldCheck, Power, CheckCircle2, GripVertical } from 'lucide-react';
-import { Toggle, AnimatedNumber } from '../../../components/common';
-import { formatNumber, formatRelativeTime } from '../../../utils/formatters';
+import { Toggle, AnimatedNumber, TimeAgo } from '../../../components/common';
+import { formatNumber } from '../../../utils/formatters';
 
 function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking, dragHandleProps }) {
     const [resultMessage, setResultMessage] = useState(null);
@@ -98,7 +98,7 @@ function AgentCard({ agent, client, onToggle, onHealthCheck, isChecking, dragHan
                 </div>
                 <div className="agent-card__stat">
                     <div className="agent-card__stat-value text-nowrap">
-                        {formatRelativeTime(agent.lastActive)}
+                        <TimeAgo date={agent.lastActive} />
                     </div>
                     <div className="agent-card__stat-label">최근 호출</div>
                 </div>

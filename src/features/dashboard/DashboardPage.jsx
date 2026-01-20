@@ -1,8 +1,8 @@
 import { useAgents } from '../../context/AgentContext';
 import { ApiUsageChart } from '../../components/charts';
-import { StatusBadge } from '../../components/common';
+import { StatusBadge, TimeAgo } from '../../components/common';
 import { StatCard } from './StatCard';
-import { formatRelativeTime, formatNumber } from '../../utils/formatters';
+import { formatNumber } from '../../utils/formatters';
 import {
     BotIcon,
     AlertCircleIconClean,
@@ -147,7 +147,7 @@ export function DashboardPage() {
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium ml-auto text-right whitespace-nowrap">
-                                    {formatRelativeTime(log.timestamp)}
+                                    <TimeAgo date={log.timestamp} />
                                 </div>
                             </div>
                         ))}
