@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { getAllAgents, getSingleAgent, getRecentActivityLogs } from '../services/agentService';
 
 /**
@@ -83,24 +84,47 @@ export function useAgentsStats() {
 /**
  * Hook to manually invalidate and refetch agents data
  * Useful for triggering updates after mutations or Realtime events
+ * 
+ * CRITICAL: All functions are memoized with useCallback to prevent
+ * infinite useEffect loops when used as dependencies
  */
 export function useInvalidateAgents() {
     const queryClient = useQueryClient();
 
+    // Memoize all functions to prevent infinite loops
+    const invalidateAll = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['agents'] });
+        queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
+    }, [queryClient]);
+
+    const invalidateAgents = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
+    }, [queryClient]);
+
+    const invalidateAgent = useCallback((agentId) => {
+        queryClient.invalidateQueries({ queryKey: ['agents', agentId] });
+        queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
+    }, [queryClient]);
+
+    const invalidateLogs = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
+    }, [queryClient]);
+
+    // Optimistic update for immediate log display
+    const addLogOptimistically = useCallback((newLog) => {
+        queryClient.setQueryData(['activity-logs', 100], (old) => {
+            if (!old) return [newLog];
+            // Add new log at the beginning and keep only 100
+            return [newLog, ...old].slice(0, 100);
+        });
+    }, [queryClient]);
+
     return {
-        invalidateAll: () => {
-            queryClient.invalidateQueries({ queryKey: ['agents'] });
-            queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
-        },
-        invalidateAgents: () => {
-            queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
-        },
-        invalidateAgent: (agentId) => {
-            queryClient.invalidateQueries({ queryKey: ['agents', agentId] });
-            queryClient.invalidateQueries({ queryKey: ['agents', 'all'] });
-        },
-        invalidateLogs: () => {
-            queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
-        },
+        invalidateAll,
+        invalidateAgents,
+        invalidateAgent,
+        invalidateLogs,
+        addLogOptimistically,
     };
 }
+

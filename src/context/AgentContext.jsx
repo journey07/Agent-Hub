@@ -15,7 +15,7 @@ export function AgentProvider({ children }) {
     // Use React Query hooks for data fetching
     const { data: rawAgents, isLoading: isLoadingAgents, error: agentsError } = useAgentsData();
     const { data: rawActivityLogs, isLoading: isLoadingLogs } = useActivityLogs(100);
-    const { invalidateAll, invalidateAgents, invalidateAgent, invalidateLogs } = useInvalidateAgents();
+    const { invalidateAll, invalidateAgents, invalidateAgent, invalidateLogs, addLogOptimistically } = useInvalidateAgents();
 
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
@@ -273,7 +273,27 @@ export function AgentProvider({ children }) {
                 },
                 (payload) => {
                     if (payload.eventType === 'INSERT' && payload.new) {
+                        // Optimistic update: immediately add log to cache for instant UI update
+                        const newLog = {
+                            id: payload.new.id,
+                            agent_id: payload.new.agent_id,
+                            agent: payload.new.agent_id, // Will be updated by background refetch
+                            action: payload.new.action || '',
+                            type: (payload.new.type === 'log' || payload.new.type === 'activity' || !payload.new.type)
+                                ? (payload.new.status || payload.new.type)
+                                : payload.new.type,
+                            status: payload.new.status || 'success',
+                            timestamp: payload.new.timestamp || new Date().toISOString(),
+                            responseTime: payload.new.response_time || 0,
+                            userName: payload.new.user_name || null
+                        };
+
+                        // Immediately update cache for instant display
+                        addLogOptimistically(newLog);
+
+                        // Background refetch to get agent name and validate data
                         invalidateLogs();
+
                         if (payload.new.agent_id) {
                             queueAgentUpdate(payload.new.agent_id);
                         }
