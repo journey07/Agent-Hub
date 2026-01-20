@@ -75,7 +75,13 @@ export default async function handler(req, res) {
 
         const actionToLog = logAction || logMessage;
 
-        console.log(`📥 Incoming API Call: ${agentId} - ${apiType} ${actionToLog ? `(Log: ${actionToLog})` : ''} ${userName ? `[User: ${userName}]` : '[No User]'}`);
+        // Validate agentId for activity logs
+        if (actionToLog && !agentId) {
+            console.error('❌ Missing agentId for activity log:', actionToLog);
+            return res.status(400).json({ error: 'agentId is required for activity logs' });
+        }
+
+        console.log(`📥 Incoming API Call: ${agentId || 'NO_AGENT_ID'} - ${apiType} ${actionToLog ? `(Log: ${actionToLog})` : ''} ${userName ? `[User: ${userName}]` : '[No User]'}`);
 
         // 1. Handle Heartbeat (Registration)
         if (apiType === 'heartbeat') {
@@ -182,36 +188,61 @@ export default async function handler(req, res) {
         }
 
         // 4. Handle Activity Log
+        // IMPORTANT: This handles login logs and other activity logs from agents
         if (actionToLog) {
-            // "Quote:"로 시작하는 메시지에 "Calculated" 추가
-            let finalAction = actionToLog;
-            if (finalAction.startsWith('Quote:') && !finalAction.startsWith('Calculated Quote:')) {
-                finalAction = `Calculated ${finalAction}`;
-            }
-            
-            const logData = {
-                agent_id: agentId,
-                action: finalAction,
-                type: apiType === 'activity_log' ? 'log' : apiType,
-                status: logType || (isError ? 'error' : 'success'),
-                timestamp: new Date().toISOString(),
-                response_time: responseTime || 0,
-                user_name: userName || null
-            };
-            
-            console.log(`📝 Inserting log to activity_logs:`, JSON.stringify(logData, null, 2));
-            
-            const { error: logError, data: logDataResult } = await supabase
-                .from('activity_logs')
-                .insert(logData)
-                .select();
-                
-            if (logError) {
-                console.error(`❌ Activity Log Error [${agentId}]:`, logError);
-                console.error('Log data that failed:', logData);
+            // Validate required fields
+            if (!agentId) {
+                const errorMsg = `❌ Cannot save activity log: agentId is missing. Action: ${actionToLog}`;
+                console.error(errorMsg);
+                console.error('Full request body:', JSON.stringify(req.body, null, 2));
+                // Don't return error - just log it, so the request doesn't fail
+                // The agent might retry if we return error
             } else {
-                console.log(`✅ Logged successfully: ${agentId} - ${actionToLog} [User: ${userName || 'null'}]`);
-                console.log('Inserted log ID:', logDataResult?.[0]?.id);
+                // "Quote:"로 시작하는 메시지에 "Calculated" 추가
+                let finalAction = actionToLog;
+                if (finalAction.startsWith('Quote:') && !finalAction.startsWith('Calculated Quote:')) {
+                    finalAction = `Calculated ${finalAction}`;
+                }
+                
+                const logData = {
+                    agent_id: agentId,
+                    action: finalAction,
+                    type: apiType === 'activity_log' ? 'log' : apiType,
+                    status: logType || (isError ? 'error' : 'success'),
+                    timestamp: new Date().toISOString(),
+                    response_time: responseTime || 0,
+                    user_name: userName || null
+                };
+                
+                console.log(`📝 [LOGIN LOG] Attempting to insert log:`, JSON.stringify(logData, null, 2));
+                
+                try {
+                    const { error: logError, data: logDataResult } = await supabase
+                        .from('activity_logs')
+                        .insert(logData)
+                        .select();
+                    
+                    if (logError) {
+                        console.error(`❌ [LOGIN LOG] Failed to insert log [${agentId}]:`, logError);
+                        console.error('Failed log data:', JSON.stringify(logData, null, 2));
+                        console.error('Error code:', logError.code);
+                        console.error('Error message:', logError.message);
+                        console.error('Error details:', logError.details);
+                        console.error('Error hint:', logError.hint);
+                    } else {
+                        const insertedId = logDataResult?.[0]?.id;
+                        console.log(`✅ [LOGIN LOG] Successfully saved: ${agentId} - "${finalAction}" [User: ${userName || 'null'}] [ID: ${insertedId}]`);
+                    }
+                } catch (insertError) {
+                    console.error(`❌ [LOGIN LOG] Exception during insert [${agentId}]:`, insertError);
+                    console.error('Exception stack:', insertError.stack);
+                    console.error('Log data that caused exception:', JSON.stringify(logData, null, 2));
+                }
+            }
+        } else {
+            // Log when actionToLog is missing (for debugging)
+            if (apiType === 'activity_log') {
+                console.warn(`⚠️ [LOGIN LOG] Received activity_log but no actionToLog. Request body:`, JSON.stringify(req.body, null, 2));
             }
         }
 
