@@ -1,8 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
 import { ApiUsageChart } from '../../components/charts';
 import { StatusBadge, TimeAgo } from '../../components/common';
 import { StatCard } from './StatCard';
-import { formatNumber } from '../../utils/formatters';
 import {
     BotIcon,
     AlertCircleIconClean,
@@ -56,9 +56,9 @@ function getActivityIcon(log) {
 }
 
 export function DashboardPage() {
-    const { agents, stats, activityLogs, weeklyApiUsage, hourlyTraffic } = useAgents();
+    const navigate = useNavigate();
+    const { agents, stats, activityLogs, weeklyApiUsage, hourlyTraffic, clients } = useAgents();
 
-    const errorAgentsList = agents.filter(a => a.status === 'error' || a.apiStatus === 'error');
 
     return (
         <div className="page animate-slideUp">
@@ -133,7 +133,7 @@ export function DashboardPage() {
                                                 ·
                                             </span>
                                         )}
-                                        <span style={{ color: '#475569', fontWeight: '500' }}>
+                                        <span style={{ color: '#475569', fontWeight: '500' }} className="activity-list-item__agent transition-colors">
                                             {log.agent}
                                         </span>
                                         {log.userName && (
@@ -159,18 +159,30 @@ export function DashboardPage() {
                     <div className="card__header mb-lg">
                         <h3 className="card__title">Agent Health Status</h3>
                     </div>
-                    <div className="flex flex-col gap-md">
+                    <div className="flex flex-col gap-xs">
                         {agents.slice(0, 6).map((agent) => (
                             <div
                                 key={agent.id}
-                                className="flex items-center justify-between p-sm rounded-lg hover:bg-slate-50 transition-colors"
+                                className="agent-list-item flex items-center justify-between p-sm rounded-lg transition-all cursor-pointer"
+                                onClick={() => navigate(`/agents/${agent.id}`)}
                             >
                                 <div className="flex items-center gap-md flex-1 min-w-0">
-                                    <div className="stat-card__icon stat-card__icon--clean flex-shrink-0">
-                                        <BotIcon size={20} />
+                                    <div
+                                        className="stat-card__icon stat-card__icon--clean flex-shrink-0 overflow-hidden flex items-center justify-center bg-slate-50 transition-transform duration-300 agent-list-item__icon-wrapper"
+                                        style={{ marginTop: '4px' }}
+                                    >
+                                        {clients.find(c => c.id === agent.clientId)?.image ? (
+                                            <img
+                                                src={clients.find(c => c.id === agent.clientId).image}
+                                                alt={agent.client}
+                                                className="w-full h-full object-contain p-0.5"
+                                            />
+                                        ) : (
+                                            <BotIcon size={20} />
+                                        )}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-sm font-semibold text-slate-900 truncate">{agent.name}</div>
+                                        <div className="text-sm font-semibold text-slate-900 truncate agent-list-item__name transition-colors">{agent.name}</div>
                                         <div className="text-xs text-slate-500 truncate">{agent.client}</div>
                                     </div>
                                 </div>

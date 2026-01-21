@@ -1672,3 +1672,39 @@
 .sortable-card-wrapper {
     touch-action: none;
 }
+
+/* ============================================
+   Agent List Item
+   ============================================ */
+
+.agent-list-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 12px;
+    margin: 0;
+    cursor: pointer;
+    /* Explicitly set pointer */
+}
+
+.agent-list-item:hover {
+    background: #ffffff;
+    border-color: rgba(99, 102, 241, 0.2);
+    /* faint primary color border */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    /* soft shadow */
+    transform: translateY(-2px);
+}
+
+.agent-list-item:hover .agent-list-item__name {
+    color: #4f46e5;
+    /* primary-dark */
+}
+
+/* Logo hover effect removed as requested */
+/* .agent-list-item:hover .agent-list-item__icon-wrapper {
+    transform: scale(1.1) rotate(5deg);
+    /* Subtle rotation for fun */
+/*    background-color: #e0e7ff;
+    /* indigo-100 */
+/*} */

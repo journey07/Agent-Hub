@@ -62,6 +62,18 @@ export function AgentDetailPage() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
+    // Scroll to top on mount or id change
+    useEffect(() => {
+        // Try to find the scrollable container first
+        const scrollContainer = document.querySelector('.app-layout__content');
+        if (scrollContainer) {
+            scrollContainer.scrollTo(0, 0);
+        } else {
+            // Fallback to window scroll
+            window.scrollTo(0, 0);
+        }
+    }, [id]);
+
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
     const agentLogs = useMemo(() => {
@@ -301,12 +313,27 @@ export function AgentDetailPage() {
         }
 
         let currentPeriodData = [];
+        // 한국 시간대 기준 오늘 날짜
+        const todayStr = getTodayInKoreaString();
+
         if (chartTimeRange === 'today') {
-            currentPeriodData = [agent.apiBreakdown];
+            // Today 탭: hourlyStats로 오늘(한국시간) 활동 여부 확인
+            // 활동이 있으면 api_breakdown.today_count가 오늘 데이터이므로 사용
+            // 활동이 없으면 api_breakdown은 어제 데이터이므로 0 반환
+            const hasTodayActivity = (agent.hourlyStats || []).some(
+                h => h.updated_at === todayStr
+            );
+
+            if (hasTodayActivity) {
+                // 오늘 활동 있음 = api_breakdown.today_count가 유효함
+                currentPeriodData = [agent.apiBreakdown];
+            } else {
+                // 오늘 활동 없음 = 모든 today_count는 어제 데이터
+                currentPeriodData = [{}];
+            }
         } else {
             const days = chartTimeRange === 'week' ? 7 : 30;
             // Use Korean timezone (24시 기준 = 자정 00:00)
-            const todayStr = getTodayInKoreaString();
             const today = getTodayInKorea();
 
             // 날짜 범위 계산: 오늘 포함하여 최근 days일
@@ -350,10 +377,15 @@ export function AgentDetailPage() {
             // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
             // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
-            // 오늘 데이터를 포함하여 총 days일의 데이터 구성
-            // agent.apiBreakdown은 {api_type: {today, total}} 구조
-            // historyWithoutToday는 {api_type: number} 구조
-            currentPeriodData = [agent.apiBreakdown, ...historyWithoutToday];
+            // 오늘 데이터: hourlyStats로 활동 여부 확인 후 api_breakdown 사용
+            const hasTodayActivity = (agent.hourlyStats || []).some(
+                h => h.updated_at === todayStr
+            );
+
+            // 오늘 활동이 있으면 api_breakdown 사용, 없으면 빈 객체
+            const todayBreakdown = hasTodayActivity ? agent.apiBreakdown : {};
+
+            currentPeriodData = [todayBreakdown, ...historyWithoutToday];
         }
 
         const sum = (types) => {

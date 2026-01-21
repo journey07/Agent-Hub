@@ -109,8 +109,9 @@ export async function getSingleAgent(agentId) {
             breakdown: row.breakdown || {}
         }));
 
-        // Fetch hourly stats (오늘 날짜만 - 한국 시간대 기준, 24시 리셋)
+        // 오늘 통계를 daily_stats에서 계산 (한국시간 24시 기준 정확한 날짜)
         const todayKorea = getTodayInKoreaString();
+        const todayDailyStats = parsedHistory.find(d => d.date === todayKorea) || { tasks: 0, calls: 0 };
 
         const { data: hourlyStats } = await supabase
             .from('hourly_stats')
@@ -156,9 +157,10 @@ export async function getSingleAgent(agentId) {
             ...agent,
             // Map snake_case to camelCase for frontend compatibility
             totalApiCalls: agent.total_api_calls,
-            todayApiCalls: agent.today_api_calls,
+            // 오눘 통계는 daily_stats 기준으로 계산 (한국시간 24시 자정 기준)
+            todayApiCalls: todayDailyStats.calls || 0,
             totalTasks: agent.total_tasks,
-            todayTasks: agent.today_tasks,
+            todayTasks: todayDailyStats.tasks || 0,
             avgResponseTime: agent.avg_response_time,
             errorRate: agent.error_rate,
             apiStatus: agent.api_status,
@@ -325,6 +327,10 @@ export async function getAllAgents() {
                     breakdown: row.breakdown || {}
                 }));
 
+            // 오늘 통계를 daily_stats에서 계산 (한국시간 24시 기준 정확한 날짜)
+            // agents.today_* 대신 사용하여 자정 리셋 문제 해결
+            const todayDailyStats = dailyHistory.find(d => d.date === todayKorea) || { tasks: 0, calls: 0 };
+
             // Get hourly stats (today only)
             const agentHourlyStats = hourlyStatsMap.get(agentId) || [];
             const hourlyData = agentHourlyStats.length > 0
@@ -355,9 +361,10 @@ export async function getAllAgents() {
                 ...agent,
                 // Map snake_case to camelCase for frontend compatibility
                 totalApiCalls: agent.total_api_calls,
-                todayApiCalls: agent.today_api_calls,
+                // 오늘 통계는 daily_stats 기준으로 계산 (한국시간 24시 자정 기준)
+                todayApiCalls: todayDailyStats.calls || 0,
                 totalTasks: agent.total_tasks,
-                todayTasks: agent.today_tasks,
+                todayTasks: todayDailyStats.tasks || 0,
                 avgResponseTime: agent.avg_response_time,
                 errorRate: agent.error_rate,
                 apiStatus: agent.api_status,
