@@ -9,12 +9,27 @@ import './AgentDetailPage.css';
 
 // Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
 function TaskPerformanceItem({ task }) {
+    // name이 문자열이고 '(API Call)'이 포함된 경우 해당 부분만 빨간색으로 렌더링
+    const renderName = () => {
+        if (typeof task.name === 'string' && task.name.includes('(API Call)')) {
+            const parts = task.name.split('(API Call)');
+            return (
+                <>
+                    {parts[0]}
+                    <span style={{ color: '#ef4444' }}>(API Call)</span>
+                    {parts[1]}
+                </>
+            );
+        }
+        return task.name;
+    };
+
     return (
         <div className="task-item-premium">
             <div className="task-info-top">
                 <div className="task-name-group">
                     <div className="task-icon-box">{task.icon}</div>
-                    <span className="task-name-text">{task.name}</span>
+                    <span className="task-name-text">{renderName()}</span>
                 </div>
                 <div className="task-count-group">
                     <span className="task-today-val">
@@ -317,19 +332,44 @@ export function AgentDetailPage() {
         const todayStr = getTodayInKoreaString();
 
         if (chartTimeRange === 'today') {
-            // Today 탭: hourlyStats로 오늘(한국시간) 활동 여부 확인
-            // 활동이 있으면 api_breakdown.today_count가 오늘 데이터이므로 사용
-            // 활동이 없으면 api_breakdown은 어제 데이터이므로 0 반환
-            const hasTodayActivity = (agent.hourlyStats || []).some(
-                h => h.updated_at === todayStr
-            );
-
-            if (hasTodayActivity) {
-                // 오늘 활동 있음 = api_breakdown.today_count가 유효함
-                currentPeriodData = [agent.apiBreakdown];
+            // 옵션상담에이전트만 daily_stats.breakdown 사용 (shouldCountTask/shouldCountApi 플래그 반영)
+            // 견적 에이전트는 api_breakdown 사용 (원래대로)
+            if (agent.id === 'agent-mansumetal-001') {
+                const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
+                
+                let todayBreakdown = {};
+                if (todayDailyStats && todayDailyStats.breakdown) {
+                    let breakdown = todayDailyStats.breakdown;
+                    
+                    // breakdown이 문자열인 경우 파싱
+                    if (typeof breakdown === 'string') {
+                        try {
+                            breakdown = JSON.parse(breakdown);
+                        } catch (e) {
+                            breakdown = {};
+                        }
+                    }
+                    
+                    // breakdown이 객체인 경우 사용
+                    if (breakdown && typeof breakdown === 'object') {
+                        todayBreakdown = breakdown;
+                    }
+                }
+                
+                currentPeriodData = [todayBreakdown];
             } else {
-                // 오늘 활동 없음 = 모든 today_count는 어제 데이터
-                currentPeriodData = [{}];
+                // 견적 에이전트: 원래대로 api_breakdown 사용
+                const hasTodayActivity = (agent.hourlyStats || []).some(
+                    h => h.updated_at === todayStr
+                );
+
+                if (hasTodayActivity) {
+                    // 오늘 활동 있음 = api_breakdown.today_count가 유효함
+                    currentPeriodData = [agent.apiBreakdown];
+                } else {
+                    // 오늘 활동 없음 = 모든 today_count는 어제 데이터
+                    currentPeriodData = [{}];
+                }
             }
         } else {
             const days = chartTimeRange === 'week' ? 7 : 30;
@@ -377,13 +417,36 @@ export function AgentDetailPage() {
             // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
             // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
-            // 오늘 데이터: hourlyStats로 활동 여부 확인 후 api_breakdown 사용
-            const hasTodayActivity = (agent.hourlyStats || []).some(
-                h => h.updated_at === todayStr
-            );
-
-            // 오늘 활동이 있으면 api_breakdown 사용, 없으면 빈 객체
-            const todayBreakdown = hasTodayActivity ? agent.apiBreakdown : {};
+            // 오늘 데이터: 옵션상담에이전트는 daily_stats.breakdown, 견적 에이전트는 api_breakdown
+            let todayBreakdown = {};
+            if (agent.id === 'agent-mansumetal-001') {
+                // 옵션상담에이전트: daily_stats.breakdown 사용
+                const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
+                
+                if (todayDailyStats && todayDailyStats.breakdown) {
+                    let breakdown = todayDailyStats.breakdown;
+                    
+                    // breakdown이 문자열인 경우 파싱
+                    if (typeof breakdown === 'string') {
+                        try {
+                            breakdown = JSON.parse(breakdown);
+                        } catch (e) {
+                            breakdown = {};
+                        }
+                    }
+                    
+                    // breakdown이 객체인 경우 사용
+                    if (breakdown && typeof breakdown === 'object') {
+                        todayBreakdown = breakdown;
+                    }
+                }
+            } else {
+                // 견적 에이전트: api_breakdown 사용 (원래대로)
+                const hasTodayActivity = (agent.hourlyStats || []).some(
+                    h => h.updated_at === todayStr
+                );
+                todayBreakdown = hasTodayActivity ? agent.apiBreakdown : {};
+            }
 
             currentPeriodData = [todayBreakdown, ...historyWithoutToday];
         }
@@ -430,7 +493,7 @@ export function AgentDetailPage() {
                 },
                 {
                     id: 'ai',
-                    name: 'AI 도우미 답변 완료',
+                    name: 'AI 도우미 답변 완료 (API Call)',
                     period: aiCount,
                     total: aiTotal,
                     icon: <PremiumIcon type="zap" color="amber" size={20} />,
