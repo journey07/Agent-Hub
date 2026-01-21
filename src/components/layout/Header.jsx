@@ -2,6 +2,7 @@ import { Menu, Bell } from 'lucide-react';
 
 export function Header({
     title,
+    icon: Icon,
     onMenuClick,
     searchValue,
     onSearchChange,
@@ -17,6 +18,7 @@ export function Header({
                 <button className="header__menu-btn" onClick={onMenuClick}>
                     <Menu size={24} />
                 </button>
+                {Icon && <div className="header__icon"><Icon size={24} /></div>}
                 <h1 className="header__title">{title}</h1>
             </div>
 

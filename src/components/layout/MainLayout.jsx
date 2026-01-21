@@ -4,13 +4,20 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { ErrorBanner } from '../common';
 import { useAgents } from '../../context/AgentContext';
+import {
+    DashboardIcon,
+    AgentsIcon,
+    ClientsIcon,
+    AnalyticsIcon,
+    SettingsIcon
+} from '../common/CustomIcons';
 
-const pageTitles = {
-    '/': '대시보드',
-    '/agents': '에이전트 관리',
-    '/clients': '클라이언트',
-    '/analytics': '분석',
-    '/settings': '설정'
+const pageConfig = {
+    '/': { title: '대시보드', icon: DashboardIcon },
+    '/agents': { title: '에이전트', icon: AgentsIcon },
+    '/clients': { title: '클라이언트', icon: ClientsIcon },
+    '/analytics': { title: '분석', icon: AnalyticsIcon },
+    '/settings': { title: '설정', icon: SettingsIcon }
 };
 
 const agentFilters = [
@@ -35,7 +42,11 @@ export function MainLayout() {
     const location = useLocation();
     const { agents, clients, error, clearError } = useAgents();
 
-    const title = location.pathname.startsWith('/agents/') ? '에이전트 디테일' : (pageTitles[location.pathname] || "Supersquad's Hub");
+    const isAgentsDetail = location.pathname.startsWith('/agents/');
+    const config = pageConfig[location.pathname] || { title: "Supersquad's Hub", icon: null };
+    const title = isAgentsDetail ? '에이전트 디테일' : config.title;
+    const icon = isAgentsDetail ? AgentsIcon : config.icon;
+
     const isAgentsPage = location.pathname === '/agents';
     const isClientsPage = location.pathname === '/clients';
     const isDashboardPage = location.pathname === '/';
@@ -56,7 +67,7 @@ export function MainLayout() {
             document.body.style.top = `-${scrollY}px`;
             document.body.style.width = '100%';
             document.body.style.overflow = 'hidden';
-            
+
             return () => {
                 // Restore scroll position when sidebar closes
                 const scrollY = document.body.style.top;
@@ -102,6 +113,7 @@ export function MainLayout() {
                 <div className="app-layout__header">
                     <Header
                         title={title}
+                        icon={icon}
                         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                         searchValue={searchTerm}
                         onSearchChange={setSearchTerm}
@@ -115,8 +127,8 @@ export function MainLayout() {
 
                 <div className="app-layout__content">
                     {error && (
-                        <ErrorBanner 
-                            error={error} 
+                        <ErrorBanner
+                            error={error}
                             onDismiss={clearError}
                             autoDismiss={true}
                             dismissAfter={8000}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ExternalLink, ChevronDown, Power, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCompactNumber } from '../../../utils/formatters';
 import { StatusBadge, Toggle, AnimatedNumber } from '../../../components/common';
@@ -8,6 +8,7 @@ import { useAgents } from '../../../context/AgentContext';
 export function ClientCard({ client, clientAgents, activeAgents }) {
     const [isExpanded, setIsExpanded] = useState(false);
     const { toggleAgent } = useAgents();
+    const navigate = useNavigate();
 
     // Calculate aggregated stats
     const totalTodayCalls = clientAgents.reduce((sum, agent) => sum + (agent.todayApiCalls || 0), 0);
@@ -103,16 +104,19 @@ export function ClientCard({ client, clientAgents, activeAgents }) {
                             <div
                                 key={agent.id}
                                 className="client-card__agent-item"
+                                onClick={() => navigate(`/agents/${agent.id}`)}
                             >
                                 <div className="client-card__agent-info">
                                     <span className={`client-card__agent-status-dot ${agent.status === 'online' || agent.status === 'processing' ? 'online' : 'offline'}`}></span>
                                     <span className="client-card__agent-name">{agent.name}</span>
                                 </div>
-                                <Toggle
-                                    checked={agent.status === 'online' || agent.status === 'processing'}
-                                    onChange={() => toggleAgent(agent.id)}
-                                    scale={0.75}
-                                />
+                                <div onClick={(e) => e.stopPropagation()}>
+                                    <Toggle
+                                        checked={agent.status === 'online' || agent.status === 'processing'}
+                                        onChange={() => toggleAgent(agent.id)}
+                                        scale={0.75}
+                                    />
+                                </div>
                             </div>
                         ))}
                         <Link

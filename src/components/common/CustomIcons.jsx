@@ -12,10 +12,12 @@ export const DashboardIcon = ({ size = 24, className }) => (
 export const AgentsIcon = ({ size = 24, className }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
         <circle cx="12" cy="12" r="9" fill="#FFB74D" fillOpacity="0.2" />
-        <path d="M12 7C9.23858 7 7 9.23858 7 12C7 14.7614 9.23858 17 12 17C14.7614 17 17 14.7614 17 12C17 9.23858 14.7614 7 12 7Z" fill="#FF9800" />
-        <circle cx="10" cy="11" r="1" fill="white" />
-        <circle cx="14" cy="11" r="1" fill="white" />
-        <path d="M10 14C10.5 14.8 11.2 15 12 15C12.8 15 13.5 14.8 14 14" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="3" cy="12" r="2" fill="white" stroke="#646a70ff" strokeWidth="1" />
+        <circle cx="21" cy="12" r="2" fill="white" stroke="#646a70ff" strokeWidth="1" />
+        <rect x="3" y="4" width="18" height="16" rx="6" fill="white" stroke="#a3a5a7ff" strokeWidth="1" />
+        <rect x="6.5" y="7.5" width="11" height="9" rx="3" fill="#1F2937" stroke="#FF9800" strokeWidth="1.5" />
+        <circle cx="9.5" cy="11" r="1.5" fill="#FF9800" />
+        <circle cx="14.5" cy="11" r="1.5" fill="#FF9800" />
     </svg>
 );
 

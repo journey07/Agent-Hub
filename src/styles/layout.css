@@ -376,7 +376,7 @@
 .header__left {
     display: flex;
     align-items: center;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-sm);
 }
 
 .header__menu-btn {
@@ -396,6 +396,14 @@
     .header__menu-btn {
         display: flex;
     }
+}
+
+.header__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+    color: #64748b;
 }
 
 .header__title {
@@ -617,7 +625,7 @@
         grid-template-columns: 1fr;
         min-width: 0;
     }
-    
+
     .page {
         padding-left: 0;
         padding-right: 0;
@@ -625,7 +633,7 @@
         width: 100%;
         max-width: 100%;
     }
-    
+
     .app-layout__content {
         padding-left: var(--spacing-sm);
         padding-right: var(--spacing-sm);
@@ -633,7 +641,7 @@
         width: 100%;
         max-width: 100%;
     }
-    
+
     /* Ensure all containers prevent horizontal scroll */
     .app-layout,
     .app-layout__main,
@@ -817,12 +825,12 @@
     .sidebar-overlay--visible {
         display: block;
     }
-    
+
     /* Ensure overlay doesn't block sidebar */
     .sidebar-overlay {
         z-index: 999 !important;
     }
-    
+
     .app-layout__sidebar {
         z-index: 1000 !important;
     }

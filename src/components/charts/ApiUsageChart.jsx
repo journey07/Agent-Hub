@@ -81,26 +81,26 @@ export function ApiUsageChart({ data, type = 'area' }) {
                     <Tooltip content={<CustomTooltip />} />
                     {type === 'area' ? (
                         <>
-                            <Area
-                                type="monotone"
-                                dataKey="calls"
-                                name="API 호출"
-                                stroke="#ef4444"
-                                strokeWidth={2}
-                                fillOpacity={1}
-                                fill="url(#colorCalls)"
-                            />
                             {data[0]?.tasks !== undefined && (
                                 <Area
                                     type="monotone"
                                     dataKey="tasks"
-                                    name="작업"
+                                    name="Tasks"
                                     stroke="#3b82f6"
                                     strokeWidth={2}
                                     fillOpacity={1}
                                     fill="url(#colorTasks)"
                                 />
                             )}
+                            <Area
+                                type="monotone"
+                                dataKey="calls"
+                                name="API Calls"
+                                stroke="#ef4444"
+                                strokeWidth={2}
+                                fillOpacity={1}
+                                fill="url(#colorCalls)"
+                            />
                         </>
                     ) : (
                         <Bar
