@@ -335,13 +335,11 @@ export function AgentDetailPage() {
             // 옵션상담에이전트만 daily_stats.breakdown 사용 (shouldCountTask/shouldCountApi 플래그 반영)
             // 견적 에이전트는 api_breakdown 사용 (원래대로)
             if (agent.id === 'agent-mansumetal-001') {
+                // 옵션상담에이전트: daily_stats.breakdown 사용
                 const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
-                
                 let todayBreakdown = {};
                 if (todayDailyStats && todayDailyStats.breakdown) {
                     let breakdown = todayDailyStats.breakdown;
-                    
-                    // breakdown이 문자열인 경우 파싱
                     if (typeof breakdown === 'string') {
                         try {
                             breakdown = JSON.parse(breakdown);
@@ -349,13 +347,10 @@ export function AgentDetailPage() {
                             breakdown = {};
                         }
                     }
-                    
-                    // breakdown이 객체인 경우 사용
                     if (breakdown && typeof breakdown === 'object') {
                         todayBreakdown = breakdown;
                     }
                 }
-                
                 currentPeriodData = [todayBreakdown];
             } else {
                 // 견적 에이전트: 원래대로 api_breakdown 사용
@@ -417,16 +412,13 @@ export function AgentDetailPage() {
             // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
             // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
-            // 오늘 데이터: 옵션상담에이전트는 daily_stats.breakdown, 견적 에이전트는 api_breakdown
+            // 오늘 데이터: 옵션상담에이전트는 api_breakdown 임시 사용, 견적 에이전트는 api_breakdown
             let todayBreakdown = {};
             if (agent.id === 'agent-mansumetal-001') {
                 // 옵션상담에이전트: daily_stats.breakdown 사용
                 const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
-                
                 if (todayDailyStats && todayDailyStats.breakdown) {
                     let breakdown = todayDailyStats.breakdown;
-                    
-                    // breakdown이 문자열인 경우 파싱
                     if (typeof breakdown === 'string') {
                         try {
                             breakdown = JSON.parse(breakdown);
@@ -434,8 +426,6 @@ export function AgentDetailPage() {
                             breakdown = {};
                         }
                     }
-                    
-                    // breakdown이 객체인 경우 사용
                     if (breakdown && typeof breakdown === 'object') {
                         todayBreakdown = breakdown;
                     }
@@ -477,10 +467,25 @@ export function AgentDetailPage() {
         // Agent-specific task definitions
         if (agent.id === 'agent-mansumetal-001') {
             const openCount = sum(['open-consulting']);
-            const openTotal = agent.apiBreakdown['open-consulting']?.total || 0;
+            // Total은 모든 dailyHistory의 breakdown에서 합산
+            const openTotal = (agent.dailyHistory || []).reduce((acc, d) => {
+                if (!d.breakdown) return acc;
+                let breakdown = d.breakdown;
+                if (typeof breakdown === 'string') {
+                    try { breakdown = JSON.parse(breakdown); } catch (e) { return acc; }
+                }
+                return acc + (Number(breakdown['open-consulting']) || 0);
+            }, 0);
 
             const aiCount = sum(['ai-consulting']);
-            const aiTotal = agent.apiBreakdown['ai-consulting']?.total || 0;
+            const aiTotal = (agent.dailyHistory || []).reduce((acc, d) => {
+                if (!d.breakdown) return acc;
+                let breakdown = d.breakdown;
+                if (typeof breakdown === 'string') {
+                    try { breakdown = JSON.parse(breakdown); } catch (e) { return acc; }
+                }
+                return acc + (Number(breakdown['ai-consulting']) || 0);
+            }, 0);
 
             return [
                 {
