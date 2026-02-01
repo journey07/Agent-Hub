@@ -1,10 +1,11 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, AlertCircle, Database, Shield, Key, Cpu, Zap, BarChart3, TrendingUp, History, ExternalLink, Edit3, Check, X } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaString, getTodayInKorea } from '../../utils/formatters';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo, useEffect } from 'react';
 import { AnimatedNumber } from '../../components/common';
+import { updateAgentInfo } from '../../services/agentService';
 import './AgentDetailPage.css';
 
 // Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
@@ -59,6 +60,13 @@ export function AgentDetailPage() {
 
     const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'logs'
     const [chartTimeRange, setChartTimeRange] = useState('today'); // 'today' (others disabled for now)
+
+    // System Info 수정 관련 상태
+    const [isEditingSystemInfo, setIsEditingSystemInfo] = useState(false);
+    const [editModel, setEditModel] = useState('');
+    const [editAccount, setEditAccount] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
     // Initialize isMobile immediately to prevent initial render issues
     const [isMobile, setIsMobile] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -88,6 +96,43 @@ export function AgentDetailPage() {
             window.scrollTo(0, 0);
         }
     }, [id]);
+
+    // System Info 수정 모드 시작
+    const handleEditStart = () => {
+        setEditModel(agent?.model || '');
+        setEditAccount(agent?.account || '');
+        setIsEditingSystemInfo(true);
+    };
+
+    // System Info 수정 취소
+    const handleEditCancel = () => {
+        setIsEditingSystemInfo(false);
+        setEditModel('');
+        setEditAccount('');
+    };
+
+    // System Info 저장
+    const handleEditSave = async () => {
+        if (!agent) return;
+        setIsSaving(true);
+        try {
+            const { error } = await updateAgentInfo(agent.id, {
+                model: editModel,
+                account: editAccount
+            });
+            if (error) {
+                console.error('Failed to save:', error);
+                alert('저장 실패: ' + error.message);
+            } else {
+                setIsEditingSystemInfo(false);
+            }
+        } catch (err) {
+            console.error('Save error:', err);
+            alert('저장 중 오류 발생');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
@@ -202,7 +247,8 @@ export function AgentDetailPage() {
         'preview-image': '2D Layout',
         'generate-3d-installation': '3D Installation',
         'calculate': 'Quote Calc',
-        'pdf': 'PDF Gen'
+        'pdf': 'PDF Gen',
+        'parse-consultation': 'Memo Parse'
     };
 
     const apiData = useMemo(() => {
@@ -332,40 +378,23 @@ export function AgentDetailPage() {
         const todayStr = getTodayInKoreaString();
 
         if (chartTimeRange === 'today') {
-            // 옵션상담에이전트만 daily_stats.breakdown 사용 (shouldCountTask/shouldCountApi 플래그 반영)
-            // 견적 에이전트는 api_breakdown 사용 (원래대로)
-            if (agent.id === 'agent-mansumetal-001') {
-                // 옵션상담에이전트: daily_stats.breakdown 사용
-                const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
-                let todayBreakdown = {};
-                if (todayDailyStats && todayDailyStats.breakdown) {
-                    let breakdown = todayDailyStats.breakdown;
-                    if (typeof breakdown === 'string') {
-                        try {
-                            breakdown = JSON.parse(breakdown);
-                        } catch (e) {
-                            breakdown = {};
-                        }
-                    }
-                    if (breakdown && typeof breakdown === 'object') {
-                        todayBreakdown = breakdown;
+            // 모든 에이전트: daily_stats.breakdown 사용
+            const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
+            let todayBreakdown = {};
+            if (todayDailyStats && todayDailyStats.breakdown) {
+                let breakdown = todayDailyStats.breakdown;
+                if (typeof breakdown === 'string') {
+                    try {
+                        breakdown = JSON.parse(breakdown);
+                    } catch (e) {
+                        breakdown = {};
                     }
                 }
-                currentPeriodData = [todayBreakdown];
-            } else {
-                // 견적 에이전트: 원래대로 api_breakdown 사용
-                const hasTodayActivity = (agent.hourlyStats || []).some(
-                    h => h.updated_at === todayStr
-                );
-
-                if (hasTodayActivity) {
-                    // 오늘 활동 있음 = api_breakdown.today_count가 유효함
-                    currentPeriodData = [agent.apiBreakdown];
-                } else {
-                    // 오늘 활동 없음 = 모든 today_count는 어제 데이터
-                    currentPeriodData = [{}];
+                if (breakdown && typeof breakdown === 'object') {
+                    todayBreakdown = breakdown;
                 }
             }
+            currentPeriodData = [todayBreakdown];
         } else {
             const days = chartTimeRange === 'week' ? 7 : 30;
             // Use Korean timezone (24시 기준 = 자정 00:00)
@@ -412,30 +441,21 @@ export function AgentDetailPage() {
             // 빈 breakdown도 포함 (0 값으로 처리하기 위해)
             // 이렇게 하면 날짜 범위 내의 모든 날짜가 포함됨
 
-            // 오늘 데이터: 옵션상담에이전트는 api_breakdown 임시 사용, 견적 에이전트는 api_breakdown
+            // 오늘 데이터: 모든 에이전트 daily_stats.breakdown 사용
             let todayBreakdown = {};
-            if (agent.id === 'agent-mansumetal-001') {
-                // 옵션상담에이전트: daily_stats.breakdown 사용
-                const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
-                if (todayDailyStats && todayDailyStats.breakdown) {
-                    let breakdown = todayDailyStats.breakdown;
-                    if (typeof breakdown === 'string') {
-                        try {
-                            breakdown = JSON.parse(breakdown);
-                        } catch (e) {
-                            breakdown = {};
-                        }
-                    }
-                    if (breakdown && typeof breakdown === 'object') {
-                        todayBreakdown = breakdown;
+            const todayDailyStats = (agent.dailyHistory || []).find(d => d.date === todayStr);
+            if (todayDailyStats && todayDailyStats.breakdown) {
+                let breakdown = todayDailyStats.breakdown;
+                if (typeof breakdown === 'string') {
+                    try {
+                        breakdown = JSON.parse(breakdown);
+                    } catch (e) {
+                        breakdown = {};
                     }
                 }
-            } else {
-                // 견적 에이전트: api_breakdown 사용 (원래대로)
-                const hasTodayActivity = (agent.hourlyStats || []).some(
-                    h => h.updated_at === todayStr
-                );
-                todayBreakdown = hasTodayActivity ? agent.apiBreakdown : {};
+                if (breakdown && typeof breakdown === 'object') {
+                    todayBreakdown = breakdown;
+                }
             }
 
             currentPeriodData = [todayBreakdown, ...historyWithoutToday];
@@ -508,14 +528,27 @@ export function AgentDetailPage() {
         }
 
         // Default: Quotation Agent tasks (agent-worldlocker-001)
+        // Total은 모든 dailyHistory의 breakdown에서 합산 (옵션분석 에이전트와 동일)
+        const sumTotal = (types) => (agent.dailyHistory || []).reduce((acc, d) => {
+            if (!d.breakdown) return acc;
+            let breakdown = d.breakdown;
+            if (typeof breakdown === 'string') {
+                try { breakdown = JSON.parse(breakdown); } catch (e) { return acc; }
+            }
+            return acc + types.reduce((sum, t) => sum + (Number(breakdown[t]) || 0), 0);
+        }, 0);
+
         const quoteCount = sum(['calculate']);
-        const quoteTotal = agent.apiBreakdown['calculate']?.total || 0;
+        const quoteTotal = sumTotal(['calculate']);
 
         const threeDCount = sum(['generate-3d-installation']);
-        const threeDTotal = agent.apiBreakdown['generate-3d-installation']?.total || 0;
+        const threeDTotal = sumTotal(['generate-3d-installation']);
 
         const excelCount = sum(['excel', 'pdf']);
-        const excelTotal = (agent.apiBreakdown['excel']?.total || 0) + (agent.apiBreakdown['pdf']?.total || 0);
+        const excelTotal = sumTotal(['excel', 'pdf']);
+
+        const parseCount = sum(['parse-consultation']);
+        const parseTotal = sumTotal(['parse-consultation']);
 
         return [
             {
@@ -541,6 +574,14 @@ export function AgentDetailPage() {
                 total: excelTotal,
                 icon: <PremiumIcon type="pdf" color="#1d853eff" size={20} />,
                 color: '#1d853eff'
+            },
+            {
+                id: 'parse',
+                name: '상담 메모 분석 (API Call)',
+                period: parseCount,
+                total: parseTotal,
+                icon: <PremiumIcon type="zap" color="#8b5cf6" size={20} />,
+                color: '#8b5cf6'
             }
         ];
     }, [agent, chartTimeRange]);
@@ -747,7 +788,7 @@ export function AgentDetailPage() {
                                         allowDuplicatedCategory={true}
                                         interval={isMobile ? 0 : "preserveStartEnd"}
                                         padding={chartTimeRange === 'today' ? { left: 0, right: 0 } : { left: 20, right: 20 }}
-                                        dx={chartTimeRange === 'today' ? 0 : 0}
+                                        dy={8}
                                     />
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                                     <Tooltip
@@ -899,16 +940,91 @@ export function AgentDetailPage() {
 
                     {/* Row 2, Col 2: System Info */}
                     <div className="section-card grid-item-system">
-                        <h3 className="section-title">
-                            <Shield size={20} style={{ color: '#0b0419ff' }} />
-                            System Info
+                        <h3 className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Shield size={20} style={{ color: '#0b0419ff' }} />
+                                System Info
+                            </div>
+                            {!isEditingSystemInfo ? (
+                                <button
+                                    onClick={handleEditStart}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        color: '#64748b'
+                                    }}
+                                    title="Edit"
+                                >
+                                    <Edit3 size={16} />
+                                </button>
+                            ) : (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button
+                                        onClick={handleEditSave}
+                                        disabled={isSaving}
+                                        style={{
+                                            background: '#10b981',
+                                            border: 'none',
+                                            cursor: isSaving ? 'not-allowed' : 'pointer',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            color: 'white',
+                                            opacity: isSaving ? 0.6 : 1
+                                        }}
+                                        title="Save"
+                                    >
+                                        <Check size={14} />
+                                    </button>
+                                    <button
+                                        onClick={handleEditCancel}
+                                        disabled={isSaving}
+                                        style={{
+                                            background: '#ef4444',
+                                            border: 'none',
+                                            cursor: isSaving ? 'not-allowed' : 'pointer',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            color: 'white'
+                                        }}
+                                        title="Cancel"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
                         </h3>
                         <div className="info-list">
                             <div className="info-item">
                                 <span className="info-label">Model Engine</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <Cpu size={18} style={{ color: '#0ea5e9' }} />
-                                    <span className="info-value">{agent.model || 'Unknown Model'}</span>
+                                    {isEditingSystemInfo ? (
+                                        <input
+                                            type="text"
+                                            value={editModel}
+                                            onChange={(e) => setEditModel(e.target.value)}
+                                            placeholder="e.g. gpt-4, gemini-pro"
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px 10px',
+                                                border: '1px solid #e2e8f0',
+                                                borderRadius: '6px',
+                                                fontSize: '14px',
+                                                outline: 'none'
+                                            }}
+                                        />
+                                    ) : (
+                                        <span className="info-value">{agent.model || 'Unknown Model'}</span>
+                                    )}
                                 </div>
                             </div>
                             <div className="info-divider" />
@@ -916,22 +1032,23 @@ export function AgentDetailPage() {
                                 <span className="info-label">Account Info</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
                                     <Key size={18} style={{ color: '#0ea5e9' }} />
-                                    {agent.id === 'agent-mansumetal-001' ? (
-                                        <span className="info-value">OpenAI - injeon07</span>
-                                    ) : (
-                                        <a
-                                            href="https://aistudio.google.com/usage?timeRange=last-28-days&project=gen-lang-client-0280231890"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="info-value"
+                                    {isEditingSystemInfo ? (
+                                        <input
+                                            type="text"
+                                            value={editAccount}
+                                            onChange={(e) => setEditAccount(e.target.value)}
+                                            placeholder="e.g. OpenAI - username"
                                             style={{
-                                                color: 'inherit',
-                                                textDecoration: 'none',
-                                                cursor: 'pointer'
+                                                flex: 1,
+                                                padding: '6px 10px',
+                                                border: '1px solid #e2e8f0',
+                                                borderRadius: '6px',
+                                                fontSize: '14px',
+                                                outline: 'none'
                                             }}
-                                        >
-                                            Google AI Studio - worldlocker.ax
-                                        </a>
+                                        />
+                                    ) : (
+                                        <span className="info-value">{agent.account || 'Not configured'}</span>
                                     )}
                                 </div>
                             </div>

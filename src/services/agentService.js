@@ -583,3 +583,25 @@ export async function checkAgentHealth(agentId) {
         };
     }
 }
+
+/**
+ * Update agent info (model, account)
+ * Used for editing agent metadata from the frontend
+ */
+export async function updateAgentInfo(agentId, updates) {
+    try {
+        const { data, error } = await supabase
+            .from('agents')
+            .update(updates)
+            .eq('id', agentId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { data, error: null };
+    } catch (error) {
+        console.error('Failed to update agent info:', error);
+        return { data: null, error };
+    }
+}

@@ -171,8 +171,9 @@ export default async function handler(req, res) {
         }
 
         // 3. Handle Regular Stats Update via RPC
-        // If it's just a log, we might skip the stats update RPC
-        if (!logAction && apiType !== 'activity_log' && apiType !== 'heartbeat' && apiType !== 'status_change') {
+        // Skip RPC only for pure activity logs (apiType === 'activity_log') or special types
+        // API calls with logAction should still trigger RPC (e.g., parse-consultation with completion log)
+        if (apiType && apiType !== 'activity_log' && apiType !== 'heartbeat' && apiType !== 'status_change') {
             const { error: rpcError } = await supabase.rpc('update_agent_stats', {
                 p_agent_id: agentId,
                 p_api_type: apiType,
