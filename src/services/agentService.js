@@ -605,3 +605,36 @@ export async function updateAgentInfo(agentId, updates) {
         return { data: null, error };
     }
 }
+
+/**
+ * Fetch activity logs for a specific agent with pagination
+ * Used for "Load More" functionality in Live Log Stream
+ */
+export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } = {}) {
+    try {
+        const { data: logRows, error } = await supabase
+            .from('activity_logs')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
+            .eq('agent_id', agentId)
+            .order('id', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+
+        const logs = (logRows || []).map(log => ({
+            id: log.id,
+            agentId: log.agent_id,
+            action: log.action,
+            type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
+            status: log.status,
+            timestamp: log.timestamp,
+            responseTime: log.response_time,
+            userName: log.user_name || null
+        }));
+
+        return { data: logs, error: null };
+    } catch (error) {
+        console.error('Failed to fetch agent activity logs:', error);
+        return { data: null, error };
+    }
+}

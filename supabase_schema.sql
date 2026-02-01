@@ -302,15 +302,15 @@ BEGIN
         v_today,
         CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
-        jsonb_build_object(p_api_type, 1)
+        jsonb_build_object(p_api_type, CASE WHEN p_should_count_task THEN 1 ELSE 0 END)
     )
     ON CONFLICT (agent_id, date) DO UPDATE
-    SET 
+    SET
         tasks = daily_stats.tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         api_calls = daily_stats.api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
         breakdown = COALESCE(daily_stats.breakdown, '{}'::jsonb) || jsonb_build_object(
-            p_api_type, 
-            COALESCE((daily_stats.breakdown->>p_api_type)::integer, 0) + 1
+            p_api_type,
+            COALESCE((daily_stats.breakdown->>p_api_type)::integer, 0) + CASE WHEN p_should_count_task THEN 1 ELSE 0 END
         );
 END;
 $$;

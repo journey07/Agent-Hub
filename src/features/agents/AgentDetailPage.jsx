@@ -5,7 +5,7 @@ import { formatNumber, formatRelativeTime, formatLogTimestamp, getTodayInKoreaSt
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
 import { useState, useMemo, useEffect } from 'react';
 import { AnimatedNumber } from '../../components/common';
-import { updateAgentInfo } from '../../services/agentService';
+import { updateAgentInfo, getAgentActivityLogs } from '../../services/agentService';
 import './AgentDetailPage.css';
 
 // Task Performance Item 컴포넌트 (애니메이션을 위해 분리)
@@ -66,6 +66,12 @@ export function AgentDetailPage() {
     const [editModel, setEditModel] = useState('');
     const [editAccount, setEditAccount] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Live Log Stream 추가 로드 관련 상태
+    const [extraLogs, setExtraLogs] = useState([]);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [hasMoreLogs, setHasMoreLogs] = useState(true);
+    const LOGS_PER_PAGE = 50;
 
     // Initialize isMobile immediately to prevent initial render issues
     const [isMobile, setIsMobile] = useState(() => {
@@ -134,12 +140,53 @@ export function AgentDetailPage() {
         }
     };
 
+    // 에이전트가 바뀌면 추가 로그 초기화
+    useEffect(() => {
+        setExtraLogs([]);
+        setHasMoreLogs(true);
+    }, [id]);
+
     // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
     // Filter logs for this agent (agent가 없어도 안전하게 처리)
-    const agentLogs = useMemo(() => {
+    const baseAgentLogs = useMemo(() => {
         if (!agent) return [];
         return activityLogs.filter(log => log.agent === agent.name || log.agentId === agent.id);
     }, [activityLogs, agent]);
+
+    // 기본 로그 + 추가 로드된 로그 합치기 (중복 제거)
+    const agentLogs = useMemo(() => {
+        if (extraLogs.length === 0) return baseAgentLogs;
+        const baseIds = new Set(baseAgentLogs.map(log => log.id));
+        const uniqueExtraLogs = extraLogs.filter(log => !baseIds.has(log.id));
+        return [...baseAgentLogs, ...uniqueExtraLogs];
+    }, [baseAgentLogs, extraLogs]);
+
+    // 추가 로그 불러오기
+    const handleLoadMore = async () => {
+        if (!agent || isLoadingMore || !hasMoreLogs) return;
+        setIsLoadingMore(true);
+        try {
+            const offset = agentLogs.length;
+            const { data, error } = await getAgentActivityLogs(agent.id, {
+                limit: LOGS_PER_PAGE,
+                offset
+            });
+            if (error) {
+                console.error('Failed to load more logs:', error);
+            } else if (data) {
+                if (data.length < LOGS_PER_PAGE) {
+                    setHasMoreLogs(false);
+                }
+                if (data.length > 0) {
+                    setExtraLogs(prev => [...prev, ...data]);
+                }
+            }
+        } catch (err) {
+            console.error('Load more error:', err);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
 
     // 시간축 표시를 위한 ticks 계산 - 모바일에서는 3시간 간격, 데스크탑에서는 모든 시간
     const xAxisTicks = useMemo(() => {
@@ -208,38 +255,41 @@ export function AgentDetailPage() {
 
             // 날짜 범위 계산: week는 최근 7일, month는 최근 30일
             const days = chartTimeRange === 'week' ? 7 : 30;
-            const startDate = new Date(today);
-            startDate.setDate(startDate.getDate() - (days - 1));
-            startDate.setHours(0, 0, 0, 0);
 
-            // 날짜 범위 내의 데이터만 필터링하고 정렬
-            const historyWithoutToday = history
-                .filter(d => {
-                    if (!d.date || d.date === todayStr) return false;
-                    const date = new Date(d.date + 'T00:00:00');
-                    date.setHours(0, 0, 0, 0);
-                    return date >= startDate;
-                })
-                .sort((a, b) => {
-                    // 날짜 기준 오름차순 정렬 (과거 → 현재)
-                    const dateA = a.date ? new Date(a.date + 'T00:00:00') : new Date(0);
-                    const dateB = b.date ? new Date(b.date + 'T00:00:00') : new Date(0);
-                    return dateA.getTime() - dateB.getTime();
-                });
+            // dailyHistory를 날짜 맵으로 변환하여 빠른 조회
+            const historyMap = new Map();
+            history.forEach(d => {
+                if (d.date) {
+                    historyMap.set(d.date, {
+                        tasks: d.tasks || 0,
+                        calls: d.calls || 0
+                    });
+                }
+            });
 
-            const todayStats = {
-                date: 'Today',
-                tasks: agent.todayTasks || 0,
-                calls: agent.todayApiCalls || 0
-            };
+            // 모든 날짜 생성 (과거 days-1일 + 오늘)
+            const fullRangeData = Array.from({ length: days }, (_, i) => {
+                const date = new Date(today);
+                date.setDate(date.getDate() - (days - 1 - i));
+                // 로컬 시간대 기준으로 YYYY-MM-DD 생성 (UTC 변환 방지)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
 
-            const combined = [...historyWithoutToday, todayStats];
+                const isToday = dateStr === todayStr;
+                const stat = isToday
+                    ? { tasks: agent.todayTasks || 0, calls: agent.todayApiCalls || 0 }
+                    : historyMap.get(dateStr) || { tasks: 0, calls: 0 };
 
-            return combined.map(d => ({
-                name: d.date === 'Today' ? 'Today' : d.date.replace(/^\d{4}-/, ''), // Remove year for cleaner x-axis
-                Tasks: Number(d.tasks || 0),
-                'API Calls': Number(d.calls || 0)
-            }));
+                return {
+                    name: isToday ? 'Today' : dateStr.replace(/^\d{4}-/, ''), // MM-DD
+                    Tasks: Number(stat.tasks || 0),
+                    'API Calls': Number(stat.calls || 0)
+                };
+            });
+
+            return fullRangeData;
         }
     }, [agent, chartTimeRange]);
 
@@ -1095,6 +1145,34 @@ export function AgentDetailPage() {
                                             )}
                                         </div>
                                     ))}
+                                    {/* 더 불러오기 버튼 */}
+                                    {hasMoreLogs && (
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            padding: '16px',
+                                            borderTop: '1px solid rgba(255,255,255,0.1)'
+                                        }}>
+                                            <button
+                                                onClick={handleLoadMore}
+                                                disabled={isLoadingMore}
+                                                style={{
+                                                    background: 'rgba(59, 130, 246, 0.2)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                                    color: '#60a5fa',
+                                                    padding: '8px 24px',
+                                                    borderRadius: '6px',
+                                                    cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                                                    fontSize: '13px',
+                                                    fontWeight: 500,
+                                                    opacity: isLoadingMore ? 0.6 : 1,
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {isLoadingMore ? 'Loading...' : 'Load 50 logs more'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <div className="empty-logs">
