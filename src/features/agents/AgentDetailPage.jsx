@@ -188,7 +188,7 @@ export function AgentDetailPage() {
         }
     };
 
-    // 시간축 표시를 위한 ticks 계산 - 모바일에서는 3시간 간격, 데스크탑에서는 모든 시간
+    // 시간축 표시를 위한 ticks 계산 - 모바일에서는 간격 조정
     const xAxisTicks = useMemo(() => {
         if (chartTimeRange === 'today') {
             if (isMobile) {
@@ -201,8 +201,19 @@ export function AgentDetailPage() {
                 // 데스크탑: 0시부터 23시까지 모든 시간을 명시적으로 지정
                 return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
             }
+        } else if (chartTimeRange === 'week') {
+            if (isMobile) {
+                // 모바일: 일주일 중 3개만 표시 (첫날, 중간, 마지막)
+                // chartData가 7개 항목이므로 0, 3, 6번째 인덱스의 name 반환
+                return null; // interval로 처리
+            }
+        } else if (chartTimeRange === 'month') {
+            if (isMobile) {
+                // 모바일: 한달 중 6개만 표시
+                return null; // interval로 처리
+            }
         }
-        return null; // 'today'가 아닌 경우는 기본 동작 사용
+        return null; // 기본 동작 사용
     }, [chartTimeRange, isMobile]);
 
     const chartData = useMemo(() => {
@@ -827,16 +838,16 @@ export function AgentDetailPage() {
                                     <XAxis
                                         dataKey="name"
                                         stroke="#64748b"
-                                        fontSize={isMobile ? 14 : 10}
+                                        fontSize={isMobile ? 11 : 10}
                                         tickLine={false}
                                         axisLine={false}
                                         ticks={chartTimeRange === 'today' ? xAxisTicks : undefined}
-                                        angle={isMobile ? 0 : (chartTimeRange === 'today' ? -45 : 0)}
-                                        textAnchor={isMobile ? "middle" : (chartTimeRange === 'today' ? "end" : "middle")}
-                                        height={isMobile ? 40 : 50}
+                                        angle={isMobile && chartTimeRange !== 'today' ? -45 : (isMobile ? 0 : (chartTimeRange === 'today' ? -45 : 0))}
+                                        textAnchor={isMobile && chartTimeRange !== 'today' ? "end" : (isMobile ? "middle" : (chartTimeRange === 'today' ? "end" : "middle"))}
+                                        height={isMobile && chartTimeRange !== 'today' ? 60 : (isMobile ? 40 : 50)}
                                         minTickGap={isMobile ? 0 : -10}
                                         allowDuplicatedCategory={true}
-                                        interval={isMobile ? 0 : "preserveStartEnd"}
+                                        interval={isMobile && chartTimeRange === 'today' ? 0 : (isMobile ? "preserveStartEnd" : "preserveStartEnd")}
                                         padding={chartTimeRange === 'today' ? { left: 0, right: 0 } : { left: 20, right: 20 }}
                                         dy={8}
                                     />
