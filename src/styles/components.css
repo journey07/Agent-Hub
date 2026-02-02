@@ -1642,6 +1642,7 @@
     background: transparent;
     border: none;
     transition: all var(--transition-fast);
+    touch-action: none;
 }
 
 .agent-card__drag-handle::before {
@@ -1667,7 +1668,7 @@
 }
 
 .sortable-card-wrapper {
-    touch-action: none;
+    touch-action: pan-y;
 }
 
 /* ============================================

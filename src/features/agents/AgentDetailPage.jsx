@@ -188,22 +188,6 @@ export function AgentDetailPage() {
         }
     };
 
-    // 시간축 표시를 위한 ticks 계산 - 모바일에서는 3시간 간격, 데스크탑에서는 모든 시간
-    const xAxisTicks = useMemo(() => {
-        if (chartTimeRange === 'today') {
-            if (isMobile) {
-                // 모바일: 3시간 간격으로 표시 (0, 3, 6, 9, 12, 15, 18, 21) - "17" 형식
-                return Array.from({ length: 8 }, (_, i) => {
-                    const hour = i * 3;
-                    return hour.toString();
-                });
-            } else {
-                // 데스크탑: 0시부터 23시까지 모든 시간을 명시적으로 지정
-                return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
-            }
-        }
-        return null; // 'today'가 아닌 경우는 기본 동작 사용
-    }, [chartTimeRange, isMobile]);
 
     const chartData = useMemo(() => {
         if (!agent) return [];
@@ -292,6 +276,33 @@ export function AgentDetailPage() {
             return fullRangeData;
         }
     }, [agent, chartTimeRange]);
+
+    // 시간축 표시를 위한 ticks 계산 - 모바일에서는 간격 조정
+    const xAxisTicks = useMemo(() => {
+        if (chartTimeRange === 'today') {
+            if (isMobile) {
+                // 모바일: 3시간 간격으로 표시 (0, 3, 6, 9, 12, 15, 18, 21) - "17" 형식
+                return Array.from({ length: 8 }, (_, i) => {
+                    const hour = i * 3;
+                    return hour.toString();
+                });
+            } else {
+                // 데스크탑: 0시부터 23시까지 모든 시간을 명시적으로 지정
+                return Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+            }
+        } else if (chartTimeRange === 'week') {
+            if (isMobile) {
+                // 모바일: Week은 7개 모두 표시
+                return null;
+            }
+        } else if (chartTimeRange === 'month') {
+            // 모바일/데스크탑 모두: Month는 15개만 표시 (2개 간격)
+            return chartData
+                .filter((_, index) => index % 2 === 0)
+                .map(item => item.name);
+        }
+        return null; // 기본 동작 사용
+    }, [chartTimeRange, isMobile, chartData]);
 
     const apiLabels = {
         'preview-image': '2D Layout',
@@ -827,13 +838,13 @@ export function AgentDetailPage() {
                                     <XAxis
                                         dataKey="name"
                                         stroke="#64748b"
-                                        fontSize={isMobile ? 14 : 10}
+                                        fontSize={isMobile ? 11 : 10}
                                         tickLine={false}
                                         axisLine={false}
-                                        ticks={chartTimeRange === 'today' ? xAxisTicks : undefined}
-                                        angle={isMobile ? 0 : (chartTimeRange === 'today' ? -45 : 0)}
-                                        textAnchor={isMobile ? "middle" : (chartTimeRange === 'today' ? "end" : "middle")}
-                                        height={isMobile ? 40 : 50}
+                                        ticks={xAxisTicks}
+                                        angle={chartTimeRange === 'today' ? (isMobile ? 0 : -45) : -45}
+                                        textAnchor={chartTimeRange === 'today' ? (isMobile ? "middle" : "end") : "end"}
+                                        height={chartTimeRange === 'today' ? (isMobile ? 40 : 50) : 60}
                                         minTickGap={isMobile ? 0 : -10}
                                         allowDuplicatedCategory={true}
                                         interval={isMobile ? 0 : "preserveStartEnd"}

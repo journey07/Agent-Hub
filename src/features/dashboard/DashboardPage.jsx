@@ -90,7 +90,7 @@ export function DashboardPage() {
             <div className="grid grid--2 mb-xl gap-xl">
                 <section className="card">
                     <div className="card__header mb-lg">
-                        <h3 className="card__title">Weekly Agent Usage</h3>
+                        <h3 className="card__title">Daily Agent Usage</h3>
                         {/* Period selector could go here */}
                     </div>
                     <ApiUsageChart data={weeklyApiUsage} type="area" />
