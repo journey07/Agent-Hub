@@ -296,12 +296,10 @@ export function AgentDetailPage() {
                 return null;
             }
         } else if (chartTimeRange === 'month') {
-            if (isMobile) {
-                // 모바일: Month는 15개만 표시 (2개 간격)
-                return chartData
-                    .filter((_, index) => index % 2 === 0)
-                    .map(item => item.name);
-            }
+            // 모바일/데스크탑 모두: Month는 15개만 표시 (2개 간격)
+            return chartData
+                .filter((_, index) => index % 2 === 0)
+                .map(item => item.name);
         }
         return null; // 기본 동작 사용
     }, [chartTimeRange, isMobile, chartData]);
@@ -844,9 +842,9 @@ export function AgentDetailPage() {
                                         tickLine={false}
                                         axisLine={false}
                                         ticks={xAxisTicks}
-                                        angle={isMobile && chartTimeRange !== 'today' ? -45 : (isMobile ? 0 : (chartTimeRange === 'today' ? -45 : 0))}
-                                        textAnchor={isMobile && chartTimeRange !== 'today' ? "end" : (isMobile ? "middle" : (chartTimeRange === 'today' ? "end" : "middle"))}
-                                        height={isMobile && chartTimeRange !== 'today' ? 60 : (isMobile ? 40 : 50)}
+                                        angle={chartTimeRange === 'today' ? (isMobile ? 0 : -45) : -45}
+                                        textAnchor={chartTimeRange === 'today' ? (isMobile ? "middle" : "end") : "end"}
+                                        height={chartTimeRange === 'today' ? (isMobile ? 40 : 50) : 60}
                                         minTickGap={isMobile ? 0 : -10}
                                         allowDuplicatedCategory={true}
                                         interval={isMobile ? 0 : "preserveStartEnd"}
