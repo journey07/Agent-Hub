@@ -1,4 +1,4 @@
-import { Menu, Bell } from 'lucide-react';
+import { Menu, Bell, RefreshCw } from 'lucide-react';
 
 export function Header({
     title,
@@ -12,6 +12,10 @@ export function Header({
     onFilterChange = null,
     filterCounts = null
 }) {
+    const handleRefresh = () => {
+        window.location.reload();
+    };
+
     return (
         <header className="header">
             <div className="header__left">
@@ -55,7 +59,14 @@ export function Header({
                 )}
 
                 <div className="header__actions">
-                    <button className="header__action-btn">
+                    <button
+                        className="header__action-btn header__action-btn--refresh"
+                        onClick={handleRefresh}
+                        title="새로고침"
+                    >
+                        <RefreshCw size={20} />
+                    </button>
+                    <button className="header__action-btn" title="알림">
                         <Bell size={20} />
                         <span className="header__action-badge"></span>
                     </button>
