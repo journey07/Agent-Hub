@@ -612,6 +612,13 @@ export async function updateAgentInfo(agentId, updates) {
  */
 export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } = {}) {
     try {
+        // Fetch agent name first
+        const { data: agent } = await supabase
+            .from('agents')
+            .select('name, client_name')
+            .eq('id', agentId)
+            .single();
+
         const { data: logRows, error } = await supabase
             .from('activity_logs')
             .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
@@ -624,6 +631,7 @@ export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } =
         const logs = (logRows || []).map(log => ({
             id: log.id,
             agentId: log.agent_id,
+            agent: agent?.name || agent?.client_name || agentId, // Add agent name for filtering
             action: log.action,
             type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
             status: log.status,

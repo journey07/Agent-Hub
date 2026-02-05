@@ -260,37 +260,38 @@
 
 /* Mobile: Remove min-width to prevent horizontal scroll */
 @media (max-width: 768px) {
+
     .grid-item-task-perf,
     .grid-item-system {
         min-width: 0;
     }
-    
+
     /* Reset grid-column for mobile to show all sections */
     .grid-item-task-perf,
     .grid-item-system,
     .grid-item-logs {
         grid-column: 1;
     }
-    
+
     .agent-detail-page {
         overflow-x: hidden;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
     }
-    
+
     .detail-content-grid {
         overflow-x: hidden;
         width: 100%;
         max-width: 100%;
     }
-    
+
     .kpi-grid {
         overflow-x: hidden;
         width: 100%;
         max-width: 100%;
     }
-    
+
     .detail-header {
         overflow-x: hidden;
         width: 100%;
@@ -299,12 +300,12 @@
         align-items: center;
         gap: 16px;
     }
-    
+
     .detail-header .header-left {
         width: 100%;
         justify-content: flex-start;
     }
-    
+
     .detail-header .detail-tabs {
         width: auto;
         max-width: 100%;
@@ -313,13 +314,13 @@
         padding: 3px;
         gap: 5px;
     }
-    
+
     .detail-header .detail-tabs .tab-btn {
         padding: 7px 14px;
         font-size: 0.85rem;
         white-space: nowrap;
     }
-    
+
     /* Mobile: Optimize log display - time on top, log message below horizontally */
     .log-entry {
         flex-direction: column;
@@ -333,12 +334,12 @@
         transition: all 0.2s ease;
         align-items: flex-start;
     }
-    
+
     .log-entry:hover {
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.12);
     }
-    
+
     .log-entry-header {
         display: flex;
         align-items: center;
@@ -350,7 +351,7 @@
         justify-content: flex-start;
         margin-bottom: 0;
     }
-    
+
     .log-entry .log-ts {
         min-width: 0;
         width: auto;
@@ -360,7 +361,7 @@
         font-weight: 500;
         text-align: left;
     }
-    
+
     .log-entry .log-type {
         min-width: 45px;
         font-size: 0.65rem;
@@ -369,12 +370,12 @@
         border-radius: 4px;
         background: rgba(255, 255, 255, 0.05);
     }
-    
+
     .log-entry .log-latency {
         font-size: 0.65rem;
         flex-shrink: 0;
     }
-    
+
     .log-entry .log-msg {
         width: 100%;
         font-size: 0.8rem;
@@ -388,7 +389,7 @@
         color: #e2e8f0;
         text-align: left;
     }
-    
+
     /* Recent logs in overview - mobile optimization */
     .recent-log-item {
         flex-wrap: nowrap;
@@ -396,7 +397,7 @@
         padding: 8px;
         font-size: 0.75rem;
     }
-    
+
     .recent-log-item .log-ts {
         min-width: 0;
         width: auto;
@@ -405,7 +406,7 @@
         margin-right: 0;
         padding-right: 0;
     }
-    
+
     .recent-log-item .log-msg {
         flex: 1;
         order: 0;
@@ -418,11 +419,11 @@
         text-overflow: clip;
         min-width: 0;
     }
-    
+
     .recent-log-item .log-type {
         display: none;
     }
-    
+
     .recent-log-item .log-msg {
         flex: 1;
         order: 0;
@@ -434,41 +435,41 @@
         text-overflow: clip;
         min-width: 0;
     }
-    
+
     .recent-log-item .log-latency {
         display: none;
     }
-    
+
     /* Terminal body - mobile optimization */
     .terminal-body {
         padding: 12px;
         font-size: 0.75rem;
     }
-    
+
     /* Mobile: Align "Connected via WebSocket" to the right */
     .terminal-subtitle {
         margin-left: auto;
         text-align: right;
     }
-    
+
     /* Mobile: Reduce "Live Log Stream" font size */
     .terminal-header .terminal-title {
         font-size: 0.8rem !important;
     }
-    
+
     /* Mobile: Reduce performance section font sizes to prevent modal cutoff */
     .task-today-val {
         font-size: 0.95rem;
     }
-    
+
     .task-name-text {
         font-size: 0.85rem;
     }
-    
+
     .task-total-val {
         font-size: 0.7rem;
     }
-    
+
     .task-item-premium {
         padding: 12px;
     }
@@ -712,6 +713,10 @@
     color: #34d399;
 }
 
+.log-type.login {
+    color: #fbbf24;
+}
+
 .log-type.error {
     color: #f87171;
 }
@@ -726,6 +731,32 @@
     font-size: 0.75rem;
     margin-left: auto;
     flex-shrink: 0;
+}
+
+/* Date Divider */
+.log-date-divider {
+    display: flex;
+    align-items: center;
+    margin: 16px 0;
+    position: relative;
+}
+
+.log-date-divider::before,
+.log-date-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(148, 163, 184, 0.3), transparent);
+}
+
+.log-date-text {
+    padding: 0 16px;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
 }
 
 .empty-logs {
@@ -944,6 +975,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -958,7 +990,7 @@
     .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
-    
+
     /* Reset grid-column for tablet to show all sections */
     .grid-item-task-perf,
     .grid-item-system,
@@ -977,12 +1009,12 @@
         align-items: center;
         gap: 16px;
     }
-    
+
     .detail-header .header-left {
         width: 100%;
         justify-content: flex-start;
     }
-    
+
     .detail-header .detail-tabs {
         width: auto;
         max-width: 100%;
@@ -991,7 +1023,7 @@
         padding: 3px;
         gap: 5px;
     }
-    
+
     .detail-header .detail-tabs .tab-btn {
         padding: 7px 14px;
         font-size: 0.85rem;

@@ -140,14 +140,32 @@ export function AgentDetailPage() {
         }
     };
 
-    // 에이전트가 바뀌면 추가 로그 초기화
+    // 에이전트가 바뀌면 추가 로그 초기화 및 직접 로드
     useEffect(() => {
         setExtraLogs([]);
         setHasMoreLogs(true);
-    }, [id]);
 
-    // 모든 훅을 조건부 return 전에 호출 (React Hooks 규칙 준수)
-    // Filter logs for this agent (agent가 없어도 안전하게 처리)
+        // 해당 에이전트의 로그를 직접 DB에서 가져오기
+        if (agent?.id) {
+            getAgentActivityLogs(agent.id, { limit: LOGS_PER_PAGE, offset: 0 })
+                .then(({ data }) => {
+                    if (data && data.length > 0) {
+                        setExtraLogs(data);
+                        // 가져온 로그가 LOGS_PER_PAGE보다 적으면 더 이상 없음
+                        if (data.length < LOGS_PER_PAGE) {
+                            setHasMoreLogs(false);
+                        }
+                    } else {
+                        setHasMoreLogs(false);
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to load initial logs:', err);
+                });
+        }
+    }, [agent?.id]);
+
+    // 전역 activityLogs에서 필터링 (실시간 업데이트용)
     const baseAgentLogs = useMemo(() => {
         if (!agent) return [];
         return activityLogs.filter(log => log.agent === agent.name || log.agentId === agent.id);
@@ -1131,31 +1149,102 @@ export function AgentDetailPage() {
                         <div className="terminal-body custom-scrollbar">
                             {agentLogs.length > 0 ? (
                                 <>
-                                    {agentLogs.map((log, idx) => (
-                                        <div key={log.id || idx} className="log-entry">
-                                            <div className="log-entry-header">
-                                                <span className="log-ts">
-                                                    [{formatLogTimestamp(log.timestamp)}]
-                                                </span>
-                                                <span className={`log-type ${log.type === 'error' ? 'error' : 'success'}`}>
-                                                    {log.type ? log.type.toUpperCase() : 'INFO'}
-                                                </span>
-                                            </div>
-                                            <span className="log-msg">
-                                                {log.action}
-                                                {log.userName && (
-                                                    <span style={{ color: '#64748b', fontSize: '0.9em', marginLeft: '8px' }}>
-                                                        - {log.userName}
-                                                    </span>
+                                    {agentLogs.map((log, idx) => {
+                                        // Check if date changed from previous log
+                                        const currentDate = log.timestamp ? new Date(log.timestamp).toLocaleDateString('ko-KR') : null;
+                                        const prevDate = idx > 0 && agentLogs[idx - 1].timestamp
+                                            ? new Date(agentLogs[idx - 1].timestamp).toLocaleDateString('ko-KR')
+                                            : null;
+                                        const showDateDivider = idx > 0 && currentDate && prevDate && currentDate !== prevDate;
+
+                                        // Check if this is a login log - improved detection
+                                        const actionLower = log.action ? log.action.toLowerCase() : '';
+                                        const isLoginLog = actionLower.includes('로그인') || actionLower.includes('login') || actionLower.includes('logged');
+
+                                        // Debug: log when we detect a login
+                                        if (isLoginLog) {
+                                            console.log('Login detected:', log.action, 'isLoginLog:', isLoginLog);
+                                        }
+
+                                        return (
+                                            <>
+                                                {showDateDivider && (
+                                                    <div className="log-date-divider" key={`divider-${idx}`}>
+                                                        <span className="log-date-text">{prevDate}</span>
+                                                    </div>
                                                 )}
-                                            </span>
-                                            {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
-                                                <span className="log-latency">
-                                                    {log.responseTime}ms
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
+                                                <div key={log.id || idx} className="log-entry">
+                                                    <div className="log-entry-header">
+                                                        <span className="log-ts">
+                                                            [{formatLogTimestamp(log.timestamp)}]
+                                                        </span>
+                                                        <span className={`log-type ${log.type === 'error' ? 'error' : isLoginLog ? 'login' : 'success'}`}>
+                                                            {log.type ? log.type.toUpperCase() : 'INFO'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="log-msg">
+                                                        {log.action}
+                                                        {log.userName && (<span style={{ color: '#64748b', fontSize: '0.9em', marginLeft: '8px' }}>
+                                                            - {log.userName}
+                                                        </span>
+                                                        )}
+                                                    </span>
+                                                    {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
+                                                        <span className="log-latency">
+                                                            {log.responseTime}ms
+                                                        </span>
+                                                    )}
+                                                    {/* Display image preview if imageUrl exists */}
+                                                    {log.imageUrl && (
+                                                        <div className="log-image-preview" style={{
+                                                            marginTop: '12px',
+                                                            padding: '8px',
+                                                            background: 'rgba(0, 0, 0, 0.3)',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid rgba(59, 130, 246, 0.3)'
+                                                        }}>
+                                                            <a
+                                                                href={log.imageUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                style={{ display: 'block', textDecoration: 'none' }}
+                                                            >
+                                                                <img
+                                                                    src={log.imageUrl}
+                                                                    alt="Generated 3D Image"
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        maxWidth: '400px',
+                                                                        height: 'auto',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                                                        display: 'block'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.target.style.transform = 'scale(1.02)';
+                                                                        e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.target.style.transform = 'scale(1)';
+                                                                        e.target.style.boxShadow = 'none';
+                                                                    }}
+                                                                />
+                                                                <div style={{
+                                                                    marginTop: '8px',
+                                                                    fontSize: '0.75rem',
+                                                                    color: '#60a5fa',
+                                                                    textAlign: 'center'
+                                                                }}>
+                                                                    Click to open in new tab
+                                                                </div>
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        );
+                                    })}
                                     {/* 더 불러오기 버튼 */}
                                     {hasMoreLogs && (
                                         <div style={{

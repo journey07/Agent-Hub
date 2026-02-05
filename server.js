@@ -134,7 +134,8 @@ app.post('/api/stats', async (req, res) => {
                     status: logType || (isError ? 'error' : 'success'),
                     timestamp: new Date().toISOString(),
                     response_time: responseTime || 0,
-                    user_name: userName || null
+                    user_name: userName || null,
+                    image_url: req.body.imageUrl || null  // Add image URL field
                 });
             if (logError) console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
         }
