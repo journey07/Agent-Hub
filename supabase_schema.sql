@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS agents (
     today_api_calls INTEGER DEFAULT 0,
     total_tasks INTEGER DEFAULT 0,
     today_tasks INTEGER DEFAULT 0,
+    total_errors INTEGER DEFAULT 0,
+    today_errors INTEGER DEFAULT 0,
     error_rate REAL DEFAULT 0,
     avg_response_time REAL DEFAULT 0,
     total_response_time INTEGER DEFAULT 0,
@@ -241,6 +243,7 @@ BEGIN
         SET 
             today_api_calls = 0,
             today_tasks = 0,
+            today_errors = 0,
             last_reset_date = v_today
         WHERE id = p_agent_id;
 
@@ -258,9 +261,12 @@ BEGIN
         today_api_calls = today_api_calls + CASE WHEN p_should_count_api THEN 1 ELSE 0 END,
         total_tasks = total_tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
         today_tasks = today_tasks + CASE WHEN p_should_count_task THEN 1 ELSE 0 END,
+        total_errors = total_errors + CASE WHEN p_is_error THEN 1 ELSE 0 END,
+        today_errors = today_errors + CASE WHEN p_is_error THEN 1 ELSE 0 END,
         total_response_time = total_response_time + p_response_time,
         response_count = response_count + 1,
         avg_response_time = (total_response_time + p_response_time) / (response_count + 1),
+        error_rate = (total_errors + CASE WHEN p_is_error THEN 1 ELSE 0 END)::REAL / (response_count + 1),
         last_reset_date = v_today  -- 항상 오늘 날짜로 업데이트
     WHERE id = p_agent_id;
 
@@ -335,6 +341,7 @@ BEGIN
     SET 
         today_api_calls = 0,
         today_tasks = 0,
+        today_errors = 0,
         last_reset_date = v_today;
     
     -- 모든 api_breakdown의 today_count 리셋
