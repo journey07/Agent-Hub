@@ -1706,3 +1706,46 @@
 /*    background-color: #e0e7ff;
     /* indigo-100 */
 /*} */
+/* ============================================
+   Activity Image Preview (Hover)
+   ============================================ */
+
+.activity-image-preview {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.95);
+    z-index: 1000;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    padding: 8px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.activity-image-preview img {
+    display: block;
+    max-width: 280px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+/* Show on hover - parent element needs position: relative */
+*:hover > .activity-image-preview {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Ensure preview doesn't get cut off by card overflow */
+.card:has(.activity-image-preview) {
+    overflow: visible;
+}

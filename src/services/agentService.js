@@ -10,7 +10,7 @@ export async function getRecentActivityLogs(limit = 100) {
         // Fetch logs
         const { data: logRows, error: logsError } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url')
             .order('id', { ascending: false })
             .limit(limit);
 
@@ -49,7 +49,8 @@ export async function getRecentActivityLogs(limit = 100) {
                 agentId: log.agent_id,
                 agent: agentInfo.name,
                 clientName: agentInfo.clientName,
-                userName: log.user_name || null
+                userName: log.user_name || null,
+                imageUrl: log.image_url || null  // Add image URL mapping
             };
         });
 
@@ -621,7 +622,7 @@ export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } =
 
         const { data: logRows, error } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url')
             .eq('agent_id', agentId)
             .order('id', { ascending: false })
             .range(offset, offset + limit - 1);
@@ -637,7 +638,8 @@ export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } =
             status: log.status,
             timestamp: log.timestamp,
             responseTime: log.response_time,
-            userName: log.user_name || null
+            userName: log.user_name || null,
+            imageUrl: log.image_url || null  // Add image URL mapping
         }));
 
         return { data: logs, error: null };

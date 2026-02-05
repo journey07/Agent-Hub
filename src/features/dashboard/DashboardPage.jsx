@@ -116,7 +116,7 @@ export function DashboardPage() {
                             <div
                                 key={log.id}
                                 className="flex items-center gap-md p-sm rounded-lg hover:bg-slate-50 transition-colors"
-                                style={{ animation: 'fadeIn 0.4s ease-in' }}
+                                style={{ animation: 'fadeIn 0.4s ease-in', position: 'relative' }}
                             >
                                 <div className="stat-card__icon stat-card__icon--clean">
                                     {getActivityIcon(log)}
@@ -142,13 +142,28 @@ export function DashboardPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-slate-500" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         {log.action}
+                                        {log.imageUrl && (
+                                            <span style={{ color: '#3b82f6', fontSize: '10px' }}>🖼️</span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium ml-auto text-right whitespace-nowrap">
                                     <TimeAgo date={log.timestamp} />
                                 </div>
+                                {/* Hover Image Preview */}
+                                {log.imageUrl && (
+                                    <div className="activity-image-preview">
+                                        <a href={log.imageUrl} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                                src={log.imageUrl}
+                                                alt="3D Generated Image"
+                                                loading="lazy"
+                                            />
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
