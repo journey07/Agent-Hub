@@ -71,7 +71,8 @@ export default async function handler(req, res) {
             logMessage,
             logType,
             userName, // 사용자명 (users 테이블의 name 컬럼 값)
-            imageUrl
+            imageUrl,
+            productType // 제품 타입: electronic, refrigerator, steel
         } = req.body;
 
         const actionToLog = logAction || logMessage;
@@ -214,7 +215,8 @@ export default async function handler(req, res) {
                     timestamp: new Date().toISOString(),
                     response_time: responseTime || 0,
                     user_name: userName || null,
-                    image_url: imageUrl || req.body.imageUrl || null
+                    image_url: imageUrl || req.body.imageUrl || null,
+                    product_type: productType || null  // 제품 타입: electronic, refrigerator, steel
                 };
 
                 console.log(`📝 [LOGIN LOG] Attempting to insert log:`, JSON.stringify(logData, null, 2));
