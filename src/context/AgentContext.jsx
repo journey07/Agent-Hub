@@ -302,7 +302,8 @@ export function AgentProvider({ children }) {
                             timestamp: payload.new.timestamp || new Date().toISOString(),
                             responseTime: payload.new.response_time || 0,
                             userName: payload.new.user_name || null,
-                            imageUrl: payload.new.image_url || null,  // Add image URL
+                            imageUrl: payload.new.image_url || null,
+                            productType: payload.new.product_type || null,  // 제품 타입: electronic, refrigerator, steel
                             clientName: agents.find(a => a.id === payload.new.agent_id)?.client_name || ''
                         };
 

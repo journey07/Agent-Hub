@@ -144,6 +144,12 @@ export function DashboardPage() {
                                     </div>
                                     <div className="text-xs text-slate-500" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         {log.action}
+                                        {log.productType && (
+                                            <span style={{ color: '#94a3b8' }}>
+                                                | {log.productType === 'refrigerator' ? '냉장' :
+                                                    log.productType === 'steel' ? '철제' : '전자식'}
+                                            </span>
+                                        )}
                                         {log.imageUrl && (
                                             <span style={{ color: '#3b82f6', fontSize: '10px' }}>🖼️</span>
                                         )}
