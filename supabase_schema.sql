@@ -96,6 +96,12 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_agent_timestamp
 -- Add user_name column to existing table (if table already exists)
 ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
 
+-- Add image_url column (for 3D images, etc.)
+ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+-- Add product_type column (electronic, refrigerator, steel)
+ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS product_type TEXT;
+
 -- ============================================
 -- Row Level Security (RLS) Policies
 -- ============================================

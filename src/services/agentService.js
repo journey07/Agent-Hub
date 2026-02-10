@@ -10,7 +10,7 @@ export async function getRecentActivityLogs(limit = 100) {
         // Fetch logs
         const { data: logRows, error: logsError } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url, product_type')
             .order('id', { ascending: false })
             .limit(limit);
 
@@ -50,7 +50,8 @@ export async function getRecentActivityLogs(limit = 100) {
                 agent: agentInfo.name,
                 clientName: agentInfo.clientName,
                 userName: log.user_name || null,
-                imageUrl: log.image_url || null  // Add image URL mapping
+                imageUrl: log.image_url || null,
+                productType: log.product_type || null  // 제품 타입: electronic, refrigerator, steel
             };
         });
 
@@ -622,7 +623,7 @@ export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } =
 
         const { data: logRows, error } = await supabase
             .from('activity_logs')
-            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url')
+            .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url, product_type')
             .eq('agent_id', agentId)
             .order('id', { ascending: false })
             .range(offset, offset + limit - 1);
@@ -639,7 +640,8 @@ export async function getAgentActivityLogs(agentId, { limit = 50, offset = 0 } =
             timestamp: log.timestamp,
             responseTime: log.response_time,
             userName: log.user_name || null,
-            imageUrl: log.image_url || null  // Add image URL mapping
+            imageUrl: log.image_url || null,
+            productType: log.product_type || null  // 제품 타입: electronic, refrigerator, steel
         }));
 
         return { data: logs, error: null };

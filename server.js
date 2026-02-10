@@ -64,7 +64,8 @@ app.post('/api/stats', async (req, res) => {
             logMessage,
             logType,
             userName,
-            imageUrl
+            imageUrl,
+            productType
         } = req.body;
 
         // Log incoming activity logs for debugging
@@ -141,7 +142,8 @@ app.post('/api/stats', async (req, res) => {
                     timestamp: new Date().toISOString(),
                     response_time: responseTime || 0,
                     user_name: userName || null,
-                    image_url: imageUrl || req.body.imageUrl || null  // Add image URL field
+                    image_url: imageUrl || req.body.imageUrl || null,
+                    product_type: productType || null  // 제품 타입: electronic, refrigerator, steel
                 });
             if (logError) console.error(`❌ Activity Log Error [${agentId}]:`, logError.message);
         }

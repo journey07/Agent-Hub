@@ -1188,6 +1188,22 @@ export function AgentDetailPage() {
                                                             - {log.userName}
                                                         </span>
                                                         )}
+                                                        {log.productType && (
+                                                            <span style={{
+                                                                marginLeft: '8px',
+                                                                padding: '2px 6px',
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.75em',
+                                                                fontWeight: 600,
+                                                                backgroundColor: log.productType === 'refrigerator' ? 'rgba(59, 130, 246, 0.2)' :
+                                                                    log.productType === 'steel' ? 'rgba(100, 116, 139, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                                                color: log.productType === 'refrigerator' ? '#60a5fa' :
+                                                                    log.productType === 'steel' ? '#94a3b8' : '#34d399'
+                                                            }}>
+                                                                {log.productType === 'refrigerator' ? '냉장' :
+                                                                    log.productType === 'steel' ? '철제' : '전자식'}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     {!isMobile && log.type === 'success' && log.responseTime && log.responseTime > 0 && (
                                                         <span className="log-latency">
