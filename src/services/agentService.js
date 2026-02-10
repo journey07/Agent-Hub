@@ -139,7 +139,7 @@ export async function getSingleAgent(agentId) {
         // Fetch activity logs (last 50)
         const { data: logRows } = await supabase
             .from('activity_logs')
-            .select('id, action, type, status, timestamp, response_time, user_name')
+            .select('id, action, type, status, timestamp, response_time, user_name, image_url, product_type')
             .eq('agent_id', agentId)
             .order('id', { ascending: false })
             .limit(50);
@@ -152,7 +152,9 @@ export async function getSingleAgent(agentId) {
             agentId,
             agent: agent.name,
             clientName: agent.client_name || '',
-            userName: log.user_name || null
+            userName: log.user_name || null,
+            imageUrl: log.image_url || null,
+            productType: log.product_type || null
         }));
 
         const fullAgent = {
@@ -239,7 +241,7 @@ export async function getAllAgents() {
             // Note: We'll get last 50 per agent, so we fetch more and filter in memory
             supabase
                 .from('activity_logs')
-                .select('id, agent_id, action, type, status, timestamp, response_time, user_name')
+                .select('id, agent_id, action, type, status, timestamp, response_time, user_name, image_url, product_type')
                 .in('agent_id', agentIds)
                 .order('id', { ascending: false })
                 .limit(agentIds.length * 50) // Approximate: 50 per agent
@@ -300,7 +302,9 @@ export async function getAllAgents() {
                     type: (log.type === 'log' || log.type === 'activity' || !log.type) ? (log.status || log.type) : log.type,
                     responseTime: log.response_time,
                     agentId: log.agent_id,
-                    userName: log.user_name || null
+                    userName: log.user_name || null,
+                    imageUrl: log.image_url || null,
+                    productType: log.product_type || null
                 });
             }
         });
