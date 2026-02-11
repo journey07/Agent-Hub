@@ -1,5 +1,21 @@
 # Dashboard 프로젝트 규칙
 
+## Agent 연동 가이드 (IMPORTANT)
+
+**새 Agent를 Dashboard Hub와 연동할 때 반드시 참조:**
+
+📄 **[docs/AGENT_INTEGRATION_GUIDE.md](./docs/AGENT_INTEGRATION_GUIDE.md)**
+
+이 가이드에 포함된 내용:
+- Database 설정 (agents, api_breakdown 테이블)
+- statsService 구현 (trackApiCall, sendActivityLog)
+- Health Endpoint 구현 (/api/health)
+- Vercel Serverless await 필수 규칙
+- Dashboard UI 수정 (Task Performance)
+- Troubleshooting
+
+---
+
 ## 중복 코드 주의 (CRITICAL)
 
 ### Stats API 엔드포인트

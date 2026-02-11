@@ -37,6 +37,24 @@ export const agents = [
         avgResponseTime: 350,
         description: '지점별 운영 데이터 및 매출 분석 리포트 생성',
         category: 'analysis'
+    },
+    {
+        id: 'agent-worldlocker-003',
+        name: '납품일정 에이전트',
+        client: '(주)월드락커',
+        clientId: 'client-worldlocker',
+        status: 'online',
+        createdAt: '2026-02-10',
+        lastActive: '2026-02-10T00:00:00',
+        todayTasks: 0,
+        totalTasks: 0,
+        todayApiCalls: 0,
+        totalApiCalls: 0,
+        errorRate: 0,
+        avgResponseTime: 0,
+        isLiveAgent: true,
+        description: '납품 일정 관리 및 Teams 연동 알림 서비스',
+        category: 'delivery'
     }
 ];
 
@@ -44,7 +62,7 @@ export const clients = [
     {
         id: 'client-worldlocker',
         name: '(주)월드락커',
-        agentCount: 2,
+        agentCount: 3,
         totalApiCalls: 850,
         plan: 'Enterprise',
         status: 'active',
