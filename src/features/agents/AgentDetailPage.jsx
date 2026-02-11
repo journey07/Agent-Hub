@@ -645,11 +645,11 @@ export function AgentDetailPage() {
                 },
                 {
                     id: 'ai-coach',
-                    name: 'AI 코치 분석 (API Call)',
+                    name: 'AI 브리핑 (API Call)',
                     period: aiCoachCount,
                     total: aiCoachTotal,
-                    icon: <PremiumIcon type="zap" color="purple" size={20} />,
-                    color: '#8b5cf6'
+                    icon: <PremiumIcon type="zap" color="yellow" size={20} />,
+                    color: '#eab308'
                 }
             ];
         }
