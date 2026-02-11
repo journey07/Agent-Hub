@@ -606,6 +606,54 @@ export function AgentDetailPage() {
             ];
         }
 
+        // 납품일정 에이전트 (agent-worldlocker-003)
+        if (agent.id === 'agent-worldlocker-003') {
+            const sumTotal = (types) => (agent.dailyHistory || []).reduce((acc, d) => {
+                if (!d.breakdown) return acc;
+                let breakdown = d.breakdown;
+                if (typeof breakdown === 'string') {
+                    try { breakdown = JSON.parse(breakdown); } catch (e) { return acc; }
+                }
+                return acc + types.reduce((s, t) => s + (Number(breakdown[t]) || 0), 0);
+            }, 0);
+
+            const teamsReadCount = sum(['teams-read']);
+            const teamsReadTotal = sumTotal(['teams-read']);
+
+            const teamsSendCount = sum(['teams-send']);
+            const teamsSendTotal = sumTotal(['teams-send']);
+
+            const aiCoachCount = sum(['ai-coach']);
+            const aiCoachTotal = sumTotal(['ai-coach']);
+
+            return [
+                {
+                    id: 'teams-read',
+                    name: 'Teams 메시지 읽기 (API Call)',
+                    period: teamsReadCount,
+                    total: teamsReadTotal,
+                    icon: <PremiumIcon type="activity" color="blue" size={20} />,
+                    color: '#3b82f6'
+                },
+                {
+                    id: 'teams-send',
+                    name: 'Teams 메시지 보내기 (API Call)',
+                    period: teamsSendCount,
+                    total: teamsSendTotal,
+                    icon: <PremiumIcon type="bell" color="emerald" size={20} />,
+                    color: '#10b981'
+                },
+                {
+                    id: 'ai-coach',
+                    name: 'AI 코치 분석 (API Call)',
+                    period: aiCoachCount,
+                    total: aiCoachTotal,
+                    icon: <PremiumIcon type="zap" color="purple" size={20} />,
+                    color: '#8b5cf6'
+                }
+            ];
+        }
+
         // Default: Quotation Agent tasks (agent-worldlocker-001)
         // Total은 모든 dailyHistory의 breakdown에서 합산 (옵션분석 에이전트와 동일)
         const sumTotal = (types) => (agent.dailyHistory || []).reduce((acc, d) => {
