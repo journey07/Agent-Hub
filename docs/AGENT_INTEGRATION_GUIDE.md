@@ -728,6 +728,71 @@ export async function POST(request: NextRequest) {
 }
 ```
 
+### 6.4 클라이언트에서 userName 전달하기 (Activity Log)
+
+Dashboard의 Recent Activity에 사용자 이름을 표시하려면, 클라이언트에서 userName을 전달해야 합니다.
+
+**클라이언트 (api.js):**
+```javascript
+// AI 브리핑 호출 시 userName 전달
+async getAiCoachReport() {
+  const user = localStorage.getItem('schedule_user')
+  const userName = user ? JSON.parse(user).name || JSON.parse(user).username : null
+
+  return this.request('/ai/coach', {
+    method: 'POST',
+    body: JSON.stringify({ userName }),
+  })
+}
+```
+
+**서버 (route.ts):**
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { trackApiCall, sendActivityLog } from '@/lib/services/statsService'
+
+export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+
+  // ✅ request body에서 userName 추출
+  let userName: string | null = null
+  try {
+    const body = await request.json()
+    userName = body.userName || null
+  } catch {
+    // No body - continue without userName
+  }
+
+  try {
+    const result = await doSomething()
+    const responseTime = Date.now() - startTime
+
+    await trackApiCall('{API_TYPE}', responseTime, false, true, true)
+
+    // ✅ userName을 4번째 파라미터로 전달
+    await sendActivityLog(
+      `작업 완료 (${responseTime}ms)`,
+      'success',
+      responseTime,
+      userName  // ← Dashboard에 사용자 이름 표시
+    )
+
+    return NextResponse.json(result)
+  } catch (error: any) {
+    // 에러 로그에도 userName 전달
+    await sendActivityLog(
+      `작업 실패: ${error.message}`,
+      'error',
+      Date.now() - startTime,
+      userName
+    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+```
+
+**결과:** Dashboard Recent Activity에 `"클라이언트명 · 에이전트명 - 사용자명 - 로그메시지"` 형식으로 표시됩니다.
+
 ---
 
 ## 7. Step 5: Dashboard UI 수정
