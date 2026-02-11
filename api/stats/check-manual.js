@@ -102,9 +102,21 @@ export default async function handler(req, res) {
         // Check agent health endpoints
         try {
             // For options consultation agent (ai-consulting), use the base_url directly (GET request)
+            // For schedule agent (worldlocker-003), use /api/health endpoint
             // For quote agent, use /api/quote/health endpoint
             const isOptionsAgent = agent.base_url.includes('/api/ai-consulting');
-            const healthUrl = isOptionsAgent ? agent.base_url : `${agent.base_url}/api/quote/health`;
+            const isScheduleAgent = agentId === 'agent-worldlocker-003';
+            const healthUrl = isOptionsAgent
+                ? agent.base_url
+                : isScheduleAgent
+                    ? `${agent.base_url}/api/health`
+                    : `${agent.base_url}/api/quote/health`;
+
+            // Debug logging
+            console.log(`🔍 [DEBUG] agentId: ${agentId}`);
+            console.log(`🔍 [DEBUG] base_url from DB: "${agent.base_url}"`);
+            console.log(`🔍 [DEBUG] isScheduleAgent: ${isScheduleAgent}`);
+            console.log(`🔍 [DEBUG] healthUrl: "${healthUrl}"`);
 
             const healthRes = await fetch(healthUrl, {
                 signal: AbortSignal.timeout(5000)
@@ -117,8 +129,8 @@ export default async function handler(req, res) {
                 newApiStatus = 'error';
             } else {
                 // Verify API endpoint
-                // For options agent, the GET request itself is the health check
-                if (!isOptionsAgent) {
+                // For options agent and schedule agent, the GET request itself is the health check
+                if (!isOptionsAgent && !isScheduleAgent) {
                     const verifyUrl = `${agent.base_url}/api/quote/verify-api`;
                     const verifyRes = await fetch(verifyUrl, {
                         method: 'POST',
@@ -134,7 +146,7 @@ export default async function handler(req, res) {
                         newApiStatus = verifyData.success ? 'healthy' : 'error';
                     }
                 } else {
-                    // For options agent, receiving 200 OK from GET is enough
+                    // For options agent and schedule agent, receiving 200 OK from GET is enough
                     newApiStatus = 'healthy';
                 }
             }
