@@ -90,7 +90,35 @@ export async function GET() {
 
 ## 1. 개요
 
-### 아키텍처
+### 아키텍처 (Mermaid Diagram)
+
+```mermaid
+graph TD
+    subgraph "Agent Layer"
+        A1[Agent 1 - Quotation]
+        A2[Agent 2 - Schedule]
+        A3[Agent N - ...]
+    end
+
+    subgraph "Core Layer (Dashboard Hub)"
+        BS[Brain Server - Express/Vercel]
+        DB[(Supabase - PostgreSQL)]
+        BS -- "RPC/Upsert" --> DB
+    end
+
+    subgraph "User Layer"
+        UI[Dashboard UI - React]
+        DB -- "Realtime Subscription" --> UI
+    end
+
+    A1 -- "Heartbeat/Stats/Logs" --> BS
+    A2 -- "Heartbeat/Stats/Logs" --> BS
+    A3 -- "Heartbeat/Stats/Logs" --> BS
+    BS -- "Health Check" --> A1
+    BS -- "Health Check" --> A2
+```
+
+### 아키텍처 (Text Diagram)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -1246,6 +1274,117 @@ Dashboard Hub에 통계/로그를 보고합니다.
   □ 로그 저장 테스트
   □ Dashboard UI 확인
 ```
+
+---
+
+---
+
+## 12. 배포 아키텍처 (Deployment Architecture)
+
+시스템은 **Vercel**과 **Render** 두 플랫폼을 전략적으로 활용합니다.
+
+### 배포 구조도
+
+```mermaid
+graph TD
+    subgraph "Vercel (Serverless Layer)"
+        FE[Dashboard UI - React]
+        V_API[Express API - Lightweight]
+        V_API -- "Login / Statistics / Monitoring" --> DB[(Supabase)]
+    end
+
+    subgraph "Render (Persistent Layer)"
+        R_API[Express Server - Heavy Duty]
+        R_API -- "Gemini AI / PDF-Excel Gen" --> R_API
+        R_API -- "Heartbeat (Stats)" --> V_API
+    end
+
+    Users((Users)) -- "Seoul Region (Fast)" --> FE
+    V_API -- "Health Check" --> R_API
+```
+
+### 플랫폼별 배포 전략
+
+| 항목 | Vercel (Lightweight API) | Render (Heavy Duty Server) |
+| :--- | :--- | :--- |
+| **적합한 작업** | 인증, 단순 CRUD, 짧은 통계 수집 | AI 연산, 이미지/파일 생성, 긴 비즈니스 로직 |
+| **응답 속도** | **매우 빠름 (서울 리전 지원)** | 보통 (주로 해외 리전) |
+| **실행 시간 제한** | 10~30초 (제한적) | **제한 없음** |
+| **인프라 형태** | 서버리스 (Serverless) | 상시 구동 서버 (PaaS) |
+| **비용 구조** | 요청당 과금 | 인스턴스 시간당 과금 |
+
+---
+
+## 13. 보안 및 권한 (Security)
+
+### Row Level Security (RLS)
+- 모든 테이블에 RLS 설정
+- Backend: `service_role` 사용
+- Frontend: 익명 또는 인증된 사용자만 접근
+
+### API Key 마스킹
+민감 정보는 전체 노출하지 않고 마스킹:
+```javascript
+apiKey: process.env.GEMINI_API_KEY
+  ? `sk-...${process.env.GEMINI_API_KEY.slice(-4)}`
+  : 'sk-unknown'
+```
+
+---
+
+## 14. 관리 스크립트
+
+### Dashboard (로컬 개발)
+```bash
+npm run dev      # Express + Vite 동시 실행
+npm run brain    # Brain Server만 실행
+npm run build    # 프로덕션 빌드
+```
+
+### Agent Backend (로컬 개발)
+```bash
+npm start        # 프로덕션 모드
+npm run dev      # 개발 모드 (--watch)
+```
+
+---
+
+## 체크리스트 요약
+
+```
+□ Step 1: Database 설정
+  □ agents 테이블에 레코드 추가
+  □ api_breakdown에 API 타입 추가
+
+□ Step 2: statsService 구현
+  □ trackApiCall 함수
+  □ sendActivityLog 함수
+  □ sendHeartbeat 함수
+
+□ Step 3: Health Endpoint 구현
+  □ GET /api/health → 200 OK
+
+□ Step 4: API Route에 Tracking 추가
+  □ 모든 호출에 await 사용!
+  □ Frontend에서 보낸 파라미터 Backend에서 추출!
+
+□ Step 5: Dashboard UI 수정
+  □ Task Performance 항목 추가
+  □ mockData.js에 에이전트 추가
+
+□ Step 6: 환경 변수 설정
+  □ Vercel에 DASHBOARD_API_URL 등 설정
+
+□ Step 7: 배포 및 검증
+  □ Health check 테스트
+  □ 로그 저장 테스트
+  □ Dashboard UI 확인
+```
+
+---
+
+> [!TIP]
+> **확장 팁**: 에이전트가 많아질 경우, Dashboard 서버는 단순 프록시 역할만 수행하고 에이전트가 Supabase에 직접 `UPSERT` 하도록 변경하면 아키텍처를 더 얇게 유지할 수 있습니다.
 
 ---
 
