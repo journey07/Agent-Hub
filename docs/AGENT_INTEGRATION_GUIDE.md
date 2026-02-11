@@ -19,6 +19,12 @@ Dashboard Hub와 새로운 Agent를 연동하기 위한 완전한 가이드입�
    - 대소문자, 하이픈 모두 일치해야 함
 
 4. Health endpoint는 /api/health 경로, GET 메소드, 5초 내 응답 필수
+
+5. Frontend에서 body로 전달하는 파라미터는 Backend에서 반드시 추출해서 사용
+   - Frontend: body: JSON.stringify({ userName })
+   - Backend: const { userName } = req.body || {}
+   - 누락 시 activity log에 사용자 정보 기록 안됨
+   - 흔한 실수: Frontend만 수정하고 Backend는 안 받음!
 ```
 
 ---
